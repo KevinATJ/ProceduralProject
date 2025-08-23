@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class FreeCamera : MonoBehaviour
@@ -10,7 +8,7 @@ public class FreeCamera : MonoBehaviour
     public float climbSpeed = 5f;
 
     [Header("Mouse")]
-    public float lookSpeed = 2f; 
+    public float lookSpeed = 2f;
     public bool invertY = false;
 
     private float rotX = 0f;
@@ -63,3 +61,4 @@ public class FreeCamera : MonoBehaviour
         transform.position += move * speed * Time.deltaTime;
     }
 }
+

@@ -19,50 +19,80 @@ public class DS_PCG_Script : MonoBehaviour
     {
         InitialiseCorners();
 
-        int max = _size - 1;
-        float randRange = 1f;
-        DiamondSquare(0, 0, max, max, randRange);
+        int tileSize = _size - 1;
+        float scale = 1f;
+
+        while (tileSize > 1)
+        {
+            int half = tileSize / 2;
+
+            // Diamond Step: puntos medios de los cuadrados
+            for (int x = half; x < _size; x += tileSize)
+            {
+                for (int y = half; y < _size; y += tileSize)
+                {
+                    DiamondStep(x, y, tileSize, scale);
+                }
+            }
+
+            // Square Step: puntos medios de los bordes
+            for (int y = 0; y < _size; y += tileSize)
+            {
+                for (int x = half; x < _size; x += tileSize)
+                {
+                    SquareStep(x, y, tileSize, scale);
+                }
+            }
+            for (int y = half; y < _size; y += tileSize)
+            {
+                for (int x = 0; x < _size; x += tileSize)
+                {
+                    SquareStep(x, y, tileSize, scale);
+                }
+            }
+
+            // Reducir ruido
+            scale /= Mathf.Pow(2.0f, _roughness);
+            tileSize /= 2;
+        }
     }
 
     private void InitialiseCorners()
     {
-        _heightmap[0, 0] = Random.value;
-        _heightmap[0, _size - 1] = Random.value;
-        _heightmap[_size - 1, 0] = Random.value;
-        _heightmap[_size - 1, _size - 1] = Random.value;
+        float mid = 0.5f;
+        _heightmap[0, 0] = Random.Range(mid - 0.1f, mid + 0.1f);
+        _heightmap[0, _size - 1] = Random.Range(mid - 0.1f, mid + 0.1f);
+        _heightmap[_size - 1, 0] = Random.Range(mid - 0.1f, mid + 0.1f);
+        _heightmap[_size - 1, _size - 1] = Random.Range(mid - 0.1f, mid + 0.1f);
     }
 
-    private void DiamondSquare(int x0, int y0, int x1, int y1, float randRange)
+    private void DiamondStep(int x, int y, int tileSize, float scale)
     {
-        int half = (x1 - x0) / 2;
-        if (half < 1) return;
+        int half = tileSize / 2;
+        float sum = 0f;
+        int count = 0;
 
-        int midX = x0 + half;
-        int midY = y0 + half;
+        // promediar esquinas válidas
+        if (x - half >= 0 && y - half >= 0) { sum += _heightmap[y - half, x - half]; count++; }
+        if (x + half < _size && y - half >= 0) { sum += _heightmap[y - half, x + half]; count++; }
+        if (x - half >= 0 && y + half < _size) { sum += _heightmap[y + half, x - half]; count++; }
+        if (x + half < _size && y + half < _size) { sum += _heightmap[y + half, x + half]; count++; }
 
-        float avg = (_heightmap[y0, x0] + _heightmap[y0, x1] + _heightmap[y1, x0] + _heightmap[y1, x1]) / 4f;
-        _heightmap[midY, midX] = avg + (Random.value * 2 - 1) * randRange;
-
-        SetSquare(midX, y0, _heightmap[y0, x0], _heightmap[y0, x1], randRange);
-        SetSquare(midX, y1, _heightmap[y1, x0], _heightmap[y1, x1], randRange);
-        SetSquare(x0, midY, _heightmap[y0, x0], _heightmap[y1, x0], randRange);
-        SetSquare(x1, midY, _heightmap[y0, x1], _heightmap[y1, x1], randRange);
-
-        float newRandRange = randRange * Mathf.Pow(0.5f, _roughness);
-
-        DiamondSquare(x0, y0, midX, midY, newRandRange);
-        DiamondSquare(midX, y0, x1, midY, newRandRange);
-        DiamondSquare(x0, midY, midX, y1, newRandRange);
-        DiamondSquare(midX, midY, x1, y1, newRandRange);
+        _heightmap[y, x] = Mathf.Clamp01(sum / count + (Random.value * 2 - 1) * scale);
     }
 
-    private void SetSquare(int x, int y, float corner1, float corner2, float randRange)
+    private void SquareStep(int x, int y, int tileSize, float scale)
     {
-        float val = (corner1 + corner2) / 2f + (Random.value * 2 - 1) * randRange;
+        int half = tileSize / 2;
+        float sum = 0f;
+        int count = 0;
 
-        val = Mathf.Clamp01(val);
+        if (x - half >= 0) { sum += _heightmap[y, x - half]; count++; }
+        if (x + half < _size) { sum += _heightmap[y, x + half]; count++; }
+        if (y - half >= 0) { sum += _heightmap[y - half, x]; count++; }
+        if (y + half < _size) { sum += _heightmap[y + half, x]; count++; }
 
-        _heightmap[y, x] = val;
+        _heightmap[y, x] = Mathf.Clamp01(sum / count + (Random.value * 2 - 1) * scale);
     }
 
     public float[,] GetHeightMap()

@@ -86,6 +86,4 @@ public class DS_Terrain : MonoBehaviour
         else if (h < 0.7f) return Color.grey;
         else return Color.white;
     }
-
-
 }
