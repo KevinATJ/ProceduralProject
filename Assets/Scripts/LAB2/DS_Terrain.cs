@@ -5,7 +5,10 @@ using UnityEngine;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class DS_Terrain : MonoBehaviour
 {
+    public enum AlgorithmType { Recursive, Iterative }
+
     [Header("Diamond-Square Settings")]
+    public AlgorithmType algorithm = AlgorithmType.Recursive;
     public int size = 129;
     public float xScale = 1f;
     public float yScale = 1f;
@@ -18,9 +21,20 @@ public class DS_Terrain : MonoBehaviour
     {
         meshFilter = GetComponent<MeshFilter>();
 
-        DS_PCG_Script ds = new DS_PCG_Script(size, roughness);
-        ds.GenerateHeightmap();
-        float[,] heightMap = ds.GetHeightMap();
+        float[,] heightMap;
+
+        if (algorithm == AlgorithmType.Iterative)
+        {
+            DS_PCG_Script ds = new DS_PCG_Script(size, roughness);
+            ds.GenerateHeightmap();
+            heightMap = ds.GetHeightMap();
+        }
+        else
+        {
+            DS_PCG_Script_Rec dsIter = new DS_PCG_Script_Rec(size, roughness);
+            dsIter.GenerateHeightmap();
+            heightMap = dsIter.GetHeightMap();
+        }
 
         Mesh mesh = BuildMesh(heightMap);
         meshFilter.mesh = mesh;
@@ -50,7 +64,6 @@ public class DS_Terrain : MonoBehaviour
             }
         }
 
-
         int triIndex = 0;
         for (int z = 0; z < height - 1; z++)
         {
@@ -79,6 +92,7 @@ public class DS_Terrain : MonoBehaviour
         mesh.RecalculateNormals();
         return mesh;
     }
+
     Color GetColorByHeight(float h)
     {
         if (h < 0.3f) return Color.blue;
