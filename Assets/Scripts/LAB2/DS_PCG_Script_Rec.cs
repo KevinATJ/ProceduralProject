@@ -4,9 +4,9 @@ using UnityEngine;
 
 public class DS_PCG_Script_Rec
 {
-    private readonly int _size;
-    private readonly float _roughness;
-    private readonly float[,] _heightmap;
+    private int _size;
+    private float _roughness;
+    private float[,] _heightmap;
 
     public DS_PCG_Script_Rec(int size, float roughness)
     {
@@ -50,7 +50,7 @@ public class DS_PCG_Script_Rec
         SetEdge(x0, midY, _heightmap[y0, x0], _heightmap[y1, x0], randRange); 
         SetEdge(x1, midY, _heightmap[y0, x1], _heightmap[y1, x1], randRange);
 
-        float newRand = randRange * (1f-_roughness);
+        float newRand = randRange / Mathf.Pow(2.0f, _roughness);
 
         DiamondSquare(x0, y0, midX, midY, newRand);
         DiamondSquare(midX, y0, x1, midY, newRand);
@@ -60,7 +60,7 @@ public class DS_PCG_Script_Rec
 
     private void SetEdge(int x, int y, float a, float b, float randRange)
     {
-        if (_heightmap[y, x] != 0f) return; // no sobreescribir
+        if (_heightmap[y, x] != 0f) return;
         _heightmap[y, x] = Mathf.Clamp01((a + b) * 0.5f + RandomNoise(randRange));
     }
 

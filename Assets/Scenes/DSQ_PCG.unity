@@ -268,7 +268,7 @@ MonoBehaviour:
   xScale: 1
   yScale: 1
   heightScale: 20
-  roughness: 0.5
+  roughness: 0.7
 --- !u!23 &633775776
 MeshRenderer:
   m_ObjectHideFlags: 0

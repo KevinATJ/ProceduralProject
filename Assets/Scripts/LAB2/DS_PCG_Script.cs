@@ -4,9 +4,9 @@ using UnityEngine;
 
 public class DS_PCG_Script
 {
-    private readonly int _size;
-    private readonly float _roughness;
-    private readonly float[,] _heightmap;
+    private int _size;
+    private float _roughness;
+    private float[,] _heightmap;
 
     public DS_PCG_Script(int size, float roughness)
     {
@@ -26,7 +26,6 @@ public class DS_PCG_Script
         {
             int half = tileSize / 2;
 
-            // Diamond Step: puntos medios de los cuadrados
             for (int x = half; x < _size; x += tileSize)
             {
                 for (int y = half; y < _size; y += tileSize)
@@ -35,7 +34,6 @@ public class DS_PCG_Script
                 }
             }
 
-            // Square Step: puntos medios de los bordes
             for (int y = 0; y < _size; y += tileSize)
             {
                 for (int x = half; x < _size; x += tileSize)
@@ -51,7 +49,6 @@ public class DS_PCG_Script
                 }
             }
 
-            // Reducir ruido
             scale /= Mathf.Pow(2.0f, _roughness);
             tileSize /= 2;
         }
@@ -72,7 +69,6 @@ public class DS_PCG_Script
         float sum = 0f;
         int count = 0;
 
-        // promediar esquinas válidas
         if (x - half >= 0 && y - half >= 0) { sum += _heightmap[y - half, x - half]; count++; }
         if (x + half < _size && y - half >= 0) { sum += _heightmap[y - half, x + half]; count++; }
         if (x - half >= 0 && y + half < _size) { sum += _heightmap[y + half, x - half]; count++; }
