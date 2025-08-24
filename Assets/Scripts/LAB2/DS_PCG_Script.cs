@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DS_PCG_Script : MonoBehaviour
+public class DS_PCG_Script
 {
     private readonly int _size;
     private readonly float _roughness;

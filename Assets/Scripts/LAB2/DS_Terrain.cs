@@ -9,7 +9,7 @@ public class DS_Terrain : MonoBehaviour
 
     [Header("Diamond-Square Settings")]
     public AlgorithmType algorithm = AlgorithmType.Recursive;
-    public int size = 129;
+    public int size = 7;
     public float xScale = 1f;
     public float yScale = 1f;
     public float heightScale = 20f;
@@ -19,6 +19,7 @@ public class DS_Terrain : MonoBehaviour
 
     void Start()
     {
+        size = (int)Mathf.Pow(2, size)+1;
         meshFilter = GetComponent<MeshFilter>();
 
         float[,] heightMap;

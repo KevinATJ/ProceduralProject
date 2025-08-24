@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DS_PCG_Script_Rec : MonoBehaviour
+public class DS_PCG_Script_Rec
 {
     private readonly int _size;
     private readonly float _roughness;
@@ -41,15 +41,16 @@ public class DS_PCG_Script_Rec : MonoBehaviour
         int midX = x0 + half;
         int midY = y0 + half;
 
-        float diamondAvg = AverageCorners(x0, y0, x1, y1);
+        float diamondAvg = (_heightmap[y0, x0] + _heightmap[y0, x1] +
+                            _heightmap[y1, x0] + _heightmap[y1, x1]) * 0.25f;
         _heightmap[midY, midX] = Mathf.Clamp01(diamondAvg + RandomNoise(randRange));
 
-        SetEdge(midX, y0, half, randRange);
-        SetEdge(midX, y1, half, randRange);
-        SetEdge(x0, midY, half, randRange);
-        SetEdge(x1, midY, half, randRange);
+        SetEdge(midX, y0, _heightmap[y0, x0], _heightmap[y0, x1], randRange); 
+        SetEdge(midX, y1, _heightmap[y1, x0], _heightmap[y1, x1], randRange); 
+        SetEdge(x0, midY, _heightmap[y0, x0], _heightmap[y1, x0], randRange); 
+        SetEdge(x1, midY, _heightmap[y0, x1], _heightmap[y1, x1], randRange);
 
-        float newRand = randRange * _roughness;
+        float newRand = randRange * (1f-_roughness);
 
         DiamondSquare(x0, y0, midX, midY, newRand);
         DiamondSquare(midX, y0, x1, midY, newRand);
@@ -57,39 +58,10 @@ public class DS_PCG_Script_Rec : MonoBehaviour
         DiamondSquare(midX, midY, x1, y1, newRand);
     }
 
-    private float AverageCorners(int x0, int y0, int x1, int y1)
+    private void SetEdge(int x, int y, float a, float b, float randRange)
     {
-        float sum = 0f;
-        int count = 0;
-
-        void AddIfValid(int x, int y)
-        {
-            if (x >= 0 && x < _size && y >= 0 && y < _size)
-            {
-                sum += _heightmap[y, x];
-                count++;
-            }
-        }
-
-        AddIfValid(x0, y0);
-        AddIfValid(x0, y1);
-        AddIfValid(x1, y0);
-        AddIfValid(x1, y1);
-
-        return sum / count;
-    }
-
-    private void SetEdge(int x, int y, int half, float randRange)
-    {
-        float sum = 0f;
-        int count = 0;
-
-        if (x - half >= 0) { sum += _heightmap[y, x - half]; count++; }
-        if (x + half < _size) { sum += _heightmap[y, x + half]; count++; }
-        if (y - half >= 0) { sum += _heightmap[y - half, x]; count++; }
-        if (y + half < _size) { sum += _heightmap[y + half, x]; count++; }
-
-        _heightmap[y, x] = Mathf.Clamp01(sum / count + RandomNoise(randRange));
+        if (_heightmap[y, x] != 0f) return; // no sobreescribir
+        _heightmap[y, x] = Mathf.Clamp01((a + b) * 0.5f + RandomNoise(randRange));
     }
 
     private float RandomNoise(float range)
