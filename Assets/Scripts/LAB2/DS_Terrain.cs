@@ -26,15 +26,15 @@ public class DS_Terrain : MonoBehaviour
 
         if (algorithm == AlgorithmType.Iterative)
         {
-            DS_PCG_Script ds = new DS_PCG_Script(size, roughness);
-            ds.GenerateHeightmap();
-            heightMap = ds.GetHeightMap();
+            DS_PCG_Script dsIter = new DS_PCG_Script(size, roughness);
+            dsIter.GenerateHeightmap();
+            heightMap = dsIter.GetHeightMap();
         }
         else
         {
-            DS_PCG_Script_Rec dsIter = new DS_PCG_Script_Rec(size, roughness);
-            dsIter.GenerateHeightmap();
-            heightMap = dsIter.GetHeightMap();
+            DS_PCG_Script_Rec dsRec = new DS_PCG_Script_Rec(size, roughness);
+            dsRec.GenerateHeightmap();
+            heightMap = dsRec.GetHeightMap();
         }
 
         Mesh mesh = BuildMesh(heightMap);

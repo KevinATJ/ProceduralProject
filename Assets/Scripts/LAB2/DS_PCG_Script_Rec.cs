@@ -45,10 +45,10 @@ public class DS_PCG_Script_Rec
                             _heightmap[y1, x0] + _heightmap[y1, x1]) * 0.25f;
         _heightmap[midY, midX] = Mathf.Clamp01(diamondAvg + RandomNoise(randRange));
 
-        SetEdge(midX, y0, _heightmap[y0, x0], _heightmap[y0, x1], randRange); 
-        SetEdge(midX, y1, _heightmap[y1, x0], _heightmap[y1, x1], randRange); 
-        SetEdge(x0, midY, _heightmap[y0, x0], _heightmap[y1, x0], randRange); 
-        SetEdge(x1, midY, _heightmap[y0, x1], _heightmap[y1, x1], randRange);
+        SetEdge(midX, y0, _heightmap[y0, x0], _heightmap[y0, x1], _heightmap[midY, midX], randRange); 
+        SetEdge(midX, y1, _heightmap[y1, x0], _heightmap[y1, x1], _heightmap[midY, midX], randRange); 
+        SetEdge(x0, midY, _heightmap[y0, x0], _heightmap[y1, x0], _heightmap[midY, midX], randRange); 
+        SetEdge(x1, midY, _heightmap[y0, x1], _heightmap[y1, x1], _heightmap[midY, midX], randRange);
 
         float newRand = randRange / Mathf.Pow(2.0f, _roughness);
 
@@ -58,10 +58,10 @@ public class DS_PCG_Script_Rec
         DiamondSquare(midX, midY, x1, y1, newRand);
     }
 
-    private void SetEdge(int x, int y, float a, float b, float randRange)
+    private void SetEdge(int x, int y, float a, float b, float c, float randRange)
     {
         if (_heightmap[y, x] != 0f) return;
-        _heightmap[y, x] = Mathf.Clamp01((a + b) * 0.5f + RandomNoise(randRange));
+        _heightmap[y, x] = Mathf.Clamp01((a + b + c) / 3f + RandomNoise(randRange));
     }
 
     private float RandomNoise(float range)
