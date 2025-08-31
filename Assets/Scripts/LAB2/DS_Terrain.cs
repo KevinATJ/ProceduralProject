@@ -16,13 +16,14 @@ public class DS_Terrain : MonoBehaviour
     public float roughness = 0.7f;
 
     private MeshFilter meshFilter;
+    float[,] heightMap;
 
-    void Start()
+    void Awake()
     {
-        size = (int)Mathf.Pow(2, size)+1;
+        size = (int)Mathf.Pow(2, size) + 1;
         meshFilter = GetComponent<MeshFilter>();
 
-        float[,] heightMap;
+
 
         if (algorithm == AlgorithmType.Iterative)
         {
@@ -37,6 +38,10 @@ public class DS_Terrain : MonoBehaviour
             heightMap = dsRec.GetHeightMap();
         }
 
+    }
+
+    private void Start()
+    {
         Mesh mesh = BuildMesh(heightMap);
         meshFilter.mesh = mesh;
     }
@@ -100,5 +105,10 @@ public class DS_Terrain : MonoBehaviour
         else if (h < 0.5f) return Color.green;
         else if (h < 0.7f) return Color.grey;
         else return Color.white;
+    }
+
+    public float[,] returnHeighMap()
+    {
+        return heightMap;
     }
 }
