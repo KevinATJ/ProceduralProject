@@ -12,12 +12,13 @@ public class TerrainAndTreeSpawner : MonoBehaviour
     public int treeCount = 20;
     public float minHeight = 0.3f;
     public float maxHeight = 0.5f;
+    public float treeHeightOffset = -0.5f;
 
-    private void Start()
+    private void Awake()
     {
         if (terrainScript == null || lSystemGenerator == null || treeBuilderPrefab == null)
         {
-            Debug.LogError("Referencias de scripts o prefabs no asignadas.");
+            Debug.LogError("Referencias de scripts o prefabs no asignadas. Asegúrate de arrastrar los componentes en el Inspector.");
             return;
         }
 
@@ -32,11 +33,12 @@ public class TerrainAndTreeSpawner : MonoBehaviour
         Vector3 terrainPosition = terrainScript.transform.position;
 
         List<Vector2Int> validTreePositions = new List<Vector2Int>();
-        for (int x = 0; x < width; x++)
+        for (int z = 0; z < height; z++)
         {
-            for (int z = 0; z < height; z++)
+            for (int x = 0; x < width; x++)
             {
-                float hNormalized = heightMap[x, z];
+                float hNormalized = heightMap[z, x];
+
                 if (hNormalized >= minHeight && hNormalized < maxHeight)
                 {
                     validTreePositions.Add(new Vector2Int(x, z));
@@ -53,9 +55,10 @@ public class TerrainAndTreeSpawner : MonoBehaviour
             int x = pos2D.x;
             int z = pos2D.y;
 
-            float hNormalized = heightMap[x, z];
+            float hNormalized = heightMap[z, x];
+            float treeY = hNormalized * terrainScript.heightScale + treeHeightOffset;
 
-            Vector3 pos = new Vector3(x * terrainScript.xScale, hNormalized * terrainScript.heightScale, z * terrainScript.yScale);
+            Vector3 pos = new Vector3(x * terrainScript.xScale, treeY, z * terrainScript.yScale);
             pos += terrainPosition;
 
             GameObject treeParent = Instantiate(treeBuilderPrefab, pos, Quaternion.identity);
