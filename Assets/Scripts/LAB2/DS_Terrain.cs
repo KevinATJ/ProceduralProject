@@ -63,8 +63,7 @@ public class DS_Terrain : MonoBehaviour
             {
                 float y = heightMap[z, x] * heightScale;
                 vertices[vertIndex] = new Vector3(x * xScale, y, z * yScale);
-                uv[vertIndex] = new Vector2((float)x / width, (float)z / height);
-
+                uv[vertIndex] = new Vector2((float)x / (width - 1), (float)z / (height - 1));
                 colors[vertIndex] = GetColorByHeight(y / heightScale);
                 vertIndex++;
             }
@@ -91,11 +90,17 @@ public class DS_Terrain : MonoBehaviour
         }
 
         Mesh mesh = new Mesh();
+        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         mesh.vertices = vertices;
         mesh.uv = uv;
         mesh.triangles = triangles;
         mesh.colors = colors;
+
+        mesh.Optimize();
         mesh.RecalculateNormals();
+        mesh.RecalculateTangents();
+        mesh.RecalculateBounds();
+
         return mesh;
     }
 

@@ -11,11 +11,10 @@ public class TerrainAndTreeSpawner : MonoBehaviour
     [Header("Tree Placement Settings")]
     public int treeCount = 20;
     public float minHeight = 0.3f;
-    public float maxHeight = 0.6f;
+    public float maxHeight = 0.5f;
 
-    void Start()
+    private void Start()
     {
-
         if (terrainScript == null || lSystemGenerator == null || treeBuilderPrefab == null)
         {
             Debug.LogError("Referencias de scripts o prefabs no asignadas.");
@@ -30,30 +29,54 @@ public class TerrainAndTreeSpawner : MonoBehaviour
         float[,] heightMap = terrainScript.returnHeighMap();
         int width = heightMap.GetLength(0);
         int height = heightMap.GetLength(1);
+        Vector3 terrainPosition = terrainScript.transform.position;
 
-        for (int i = 0; i < treeCount; i++)
+        List<Vector2Int> validTreePositions = new List<Vector2Int>();
+        for (int x = 0; x < width; x++)
         {
-            int x = Random.Range(0, width);
-            int z = Random.Range(0, height);
+            for (int z = 0; z < height; z++)
+            {
+                float hNormalized = heightMap[x, z];
+                if (hNormalized >= minHeight && hNormalized < maxHeight)
+                {
+                    validTreePositions.Add(new Vector2Int(x, z));
+                }
+            }
+        }
+
+        Shuffle(validTreePositions);
+
+        int treesToSpawn = Mathf.Min(treeCount, validTreePositions.Count);
+        for (int i = 0; i < treesToSpawn; i++)
+        {
+            Vector2Int pos2D = validTreePositions[i];
+            int x = pos2D.x;
+            int z = pos2D.y;
+
             float hNormalized = heightMap[x, z];
 
-            if (hNormalized < minHeight || hNormalized > maxHeight)
-            {
-                i--;
-                continue;
-            }
-
             Vector3 pos = new Vector3(x * terrainScript.xScale, hNormalized * terrainScript.heightScale, z * terrainScript.yScale);
+            pos += terrainPosition;
 
             GameObject treeParent = Instantiate(treeBuilderPrefab, pos, Quaternion.identity);
 
             string treeSentence = lSystemGenerator.GenerateSentence();
-
             TreeBuilder builder = treeParent.GetComponent<TreeBuilder>();
             if (builder != null)
             {
                 builder.DrawTree(treeSentence);
             }
+        }
+    }
+
+    private void Shuffle(List<Vector2Int> list)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            Vector2Int temp = list[i];
+            int randomIndex = Random.Range(i, list.Count);
+            list[i] = list[randomIndex];
+            list[randomIndex] = temp;
         }
     }
 }

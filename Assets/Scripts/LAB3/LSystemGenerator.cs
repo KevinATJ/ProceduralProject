@@ -12,10 +12,10 @@ public class LSystemGenerator : MonoBehaviour
     void Awake()
     {
         rules = new Dictionary<char, string>
-    {
-        { 'X', "F[+X][-X]FXL" },
-        { 'F', "FF" }
-    };
+        {
+            { 'X', "F[+X][-X]FXL" },
+            { 'F', "FF" }
+        };
     }
 
     public string GenerateSentence()

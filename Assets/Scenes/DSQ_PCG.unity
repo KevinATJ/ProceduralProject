@@ -328,7 +328,7 @@ Transform:
   m_GameObject: {fileID: 633775774}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 11.73875, y: -13.760112, z: -0.8439095}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -458,7 +458,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 86ad8e879caffc5409d9d33dfb0b5a14, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  iterations: 6
+  iterations: 4
   axiom: X
 --- !u!114 &1467266158
 MonoBehaviour:
@@ -475,9 +475,9 @@ MonoBehaviour:
   terrainScript: {fileID: 633775775}
   lSystemGenerator: {fileID: 1467266157}
   treeBuilderPrefab: {fileID: 3090340651783224924, guid: 53eaf5cef124edc4ab9ff794950f4a57, type: 3}
-  treeCount: 20
+  treeCount: 100
   minHeight: 0.3
-  maxHeight: 0.6
+  maxHeight: 0.5
 --- !u!4 &1467266159
 Transform:
   m_ObjectHideFlags: 0
@@ -487,7 +487,7 @@ Transform:
   m_GameObject: {fileID: 1467266156}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3.2208037, y: 2.5235457, z: 1.8900449}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
