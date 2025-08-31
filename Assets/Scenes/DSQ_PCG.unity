@@ -440,7 +440,7 @@ GameObject:
   - component: {fileID: 1467266158}
   - component: {fileID: 1467266157}
   m_Layer: 0
-  m_Name: Terrain2
+  m_Name: Tree
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -478,6 +478,7 @@ MonoBehaviour:
   treeCount: 100
   minHeight: 0.3
   maxHeight: 0.5
+  treeHeightOffset: -0.5
 --- !u!4 &1467266159
 Transform:
   m_ObjectHideFlags: 0
