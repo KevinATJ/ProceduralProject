@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class TerrainAndTreeSpawner : MonoBehaviour
+public class TreeSpawner : MonoBehaviour
 {
     public DS_Terrain terrainScript;
     public LSystemGenerator lSystemGenerator;

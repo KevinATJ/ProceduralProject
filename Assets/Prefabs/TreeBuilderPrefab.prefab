@@ -46,6 +46,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   branchPrefab: {fileID: 2737666220699860076, guid: 1392adb6b83e9c641aef386a9a450933, type: 3}
   leafPrefab: {fileID: 6305827462893811019, guid: 27cdb95388150eb46a7e0159f0e174c7, type: 3}
-  angle: 25
-  length: 1
-  width: 0.2
+  angle: 35

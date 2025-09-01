@@ -7,8 +7,9 @@ public class TreeBuilder : MonoBehaviour
 {
     public GameObject branchPrefab;
     public GameObject leafPrefab;
-    public float angle = 25f;
-    float length;
+    public float angle = 40f;
+    float branchLength;
+    float leafLength;
 
 
     private Stack<TransformInfo> transformStack;
@@ -16,8 +17,9 @@ public class TreeBuilder : MonoBehaviour
     void Awake()
     {
         transformStack = new Stack<TransformInfo>();
-        length = branchPrefab.transform.localScale.y;
-        Debug.Log("Lenght :" + length);
+        branchLength = branchPrefab.transform.localScale.y;
+        leafLength = leafPrefab.transform.localScale.y;
+        Debug.Log("Lenght :" + branchLength);
     }
 
     private void Start()
@@ -35,16 +37,16 @@ public class TreeBuilder : MonoBehaviour
             switch (c)
             {
                 case 'F':
-                    Vector3 newPos = initialPos + rotation * Vector3.up * length;
+                    Vector3 branchPos = initialPos + rotation * Vector3.up * branchLength;
                     GameObject branch = Instantiate(branchPrefab, transform);
-                    branch.transform.localPosition = (initialPos + newPos) / 2f;
+                    branch.transform.localPosition = initialPos+branchPos;
                     branch.transform.localRotation = rotation;
 
-                    initialPos = newPos;
+                    initialPos = branchPos;
                     break;
                 case '+':
 
-                    rotation *= Quaternion.Euler(0, angle, 0) * Quaternion.Euler(0, 0, angle);
+                    rotation *= Quaternion.Euler(0, angle, 0) * Quaternion.Euler(0, 0, angle);//2 caracteres más de rotación
                     break;
                 case '-':
                     rotation *= Quaternion.Euler(0, -angle, 0) * Quaternion.Euler(0, 0, -angle);
@@ -58,8 +60,10 @@ public class TreeBuilder : MonoBehaviour
                     rotation = ti.rotation;
                     break;
                 case 'L':
+                    Vector3 leafPos = initialPos + rotation * Vector3.up * leafLength;
                     GameObject leaf = Instantiate(leafPrefab, transform);
-                    leaf.transform.localPosition = initialPos;
+                    leaf.transform.localPosition = initialPos+leafPos;
+                    leaf.transform.localRotation = rotation;
                     break;
             }
         }
