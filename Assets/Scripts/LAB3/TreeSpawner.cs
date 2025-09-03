@@ -20,6 +20,10 @@ public class TreeSpawner : MonoBehaviour
             return;
         }
 
+        
+    }
+    private void Start()
+    {
         SpawnTrees();
     }
 

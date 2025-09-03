@@ -17,6 +17,7 @@ public class DS_Terrain : MonoBehaviour
 
     private MeshFilter meshFilter;
     float[,] heightMap;
+    float[,] newHeightMap;
 
     void Awake()
     {
@@ -42,8 +43,11 @@ public class DS_Terrain : MonoBehaviour
 
     private void Start()
     {
-        Mesh mesh = BuildMesh(heightMap);
-        meshFilter.mesh = mesh;
+       CA_TerrainUpgrade caGenerator = new CA_TerrainUpgrade();
+       heightMap = caGenerator.ApplyCA(heightMap, 1);
+       newHeightMap = heightMap;
+       Mesh mesh = BuildMesh(newHeightMap);
+       meshFilter.mesh = mesh;
     }
 
     Mesh BuildMesh(float[,] heightMap)
@@ -106,7 +110,9 @@ public class DS_Terrain : MonoBehaviour
 
     Color GetColorByHeight(float h)
     {
-        if (h < 0.3f) return Color.blue;
+        //float rounded = Mathf.Round(h * 100f) / 100f;
+        if (h < 0.25f) return Color.blue;
+        else if (h < 0.35f) return Color.yellow;
         else if (h < 0.5f) return Color.green;
         else if (h < 0.7f) return Color.grey;
         else return Color.white;
@@ -114,6 +120,6 @@ public class DS_Terrain : MonoBehaviour
 
     public float[,] returnHeighMap()
     {
-        return heightMap;
+        return newHeightMap;
     }
 }
