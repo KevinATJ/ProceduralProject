@@ -13,6 +13,9 @@ public class DS_PCG_Script_Rec
         _size = size;
         _roughness = roughness;
         _heightmap = new float[size, size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+                _heightmap[y, x] = -1f;
     }
 
     public void GenerateHeightmap()
@@ -60,7 +63,7 @@ public class DS_PCG_Script_Rec
 
     private void SetEdge(int x, int y, float a, float b, float c, float randRange)
     {
-        if (_heightmap[y, x] != 0f) return;
+        if (_heightmap[y, x] != -1f) return;
         _heightmap[y, x] = Mathf.Clamp01((a + b + c) / 3f + RandomNoise(randRange));
     }
 

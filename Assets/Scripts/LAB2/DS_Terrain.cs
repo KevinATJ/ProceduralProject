@@ -44,7 +44,7 @@ public class DS_Terrain : MonoBehaviour
     private void Start()
     {
        CA_TerrainUpgrade caGenerator = new CA_TerrainUpgrade();
-       heightMap = caGenerator.ApplyCA(heightMap, 1);
+       heightMap = caGenerator.ApplyCA(heightMap, 20);
        newHeightMap = heightMap;
        Mesh mesh = BuildMesh(newHeightMap);
        meshFilter.mesh = mesh;
