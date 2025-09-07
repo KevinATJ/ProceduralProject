@@ -207,7 +207,7 @@ public class DS_Terrain : MonoBehaviour
         }
 
         CA_TerrainUpgrade caGenerator = new CA_TerrainUpgrade(config);
-        heightMap = caGenerator.ApplyCA(heightMap, 20);
+        heightMap = caGenerator.ApplyCA(heightMap, CA_iterations, CA_neighborhood);
         newHeightMap = heightMap;
         Mesh mesh = BuildMesh(newHeightMap);
         meshFilter.mesh = mesh;
