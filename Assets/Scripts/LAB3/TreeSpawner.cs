@@ -63,10 +63,18 @@ public class TreeSpawner : MonoBehaviour
 
             GameObject treeParent = Instantiate(treeBuilderPrefab, pos, Quaternion.identity);
 
-            string treeSentence = lSystemGenerator.GenerateSentence();
+            // Selecciona un tipo de árbol aleatorio
+            int treeTypeIndex = Random.Range(0, lSystemGenerator.treeTypes.Count);
+            string treeSentence = lSystemGenerator.GenerateSentence(treeTypeIndex);
+
             TreeBuilder builder = treeParent.GetComponent<TreeBuilder>();
             if (builder != null)
             {
+                // Asigna el ángulo y las escalas del tipo de árbol
+                var ruleSet = lSystemGenerator.treeTypes[treeTypeIndex];
+                builder.angle = ruleSet.angle;
+                builder.branchScaleY = ruleSet.branchScaleY;
+                builder.Awake();
                 builder.DrawTree(treeSentence);
             }
         }

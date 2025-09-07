@@ -264,11 +264,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   algorithm: 0
-  size: 8
+  size: 7
   xScale: 1
   yScale: 1
   heightScale: 20
-  roughness: 0.7
+  roughness: 0.9
 --- !u!23 &633775776
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -458,8 +458,39 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 86ad8e879caffc5409d9d33dfb0b5a14, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  iterations: 4
-  axiom: X
+  treeTypes:
+  - name: Arbol normal
+    axiom: X
+    iterations: 10
+    angle: 28
+    branchScaleY: 1
+    rulesList:
+    - symbol: 88
+      replacement: FFFFFFFA
+    - symbol: 65
+      replacement: '[B]////[B]////[B]'
+    - symbol: 66
+      replacement: +FFFAL
+  - name: Arbol 2D
+    axiom: X
+    iterations: 6
+    angle: 20
+    branchScaleY: 0.08
+    rulesList:
+    - symbol: 88
+      replacement: F[+X]F[-X]+X
+    - symbol: 70
+      replacement: FF
+  - name: Arbol Secundario
+    axiom: X
+    iterations: 4
+    angle: 30
+    branchScaleY: 0.6
+    rulesList:
+    - symbol: 88
+      replacement: F[+X][-X][(X][)X]FLX
+    - symbol: 70
+      replacement: FF
 --- !u!114 &1467266158
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -475,7 +506,7 @@ MonoBehaviour:
   terrainScript: {fileID: 633775775}
   lSystemGenerator: {fileID: 1467266157}
   treeBuilderPrefab: {fileID: 3090340651783224924, guid: 53eaf5cef124edc4ab9ff794950f4a57, type: 3}
-  treeCount: 100
+  treeCount: 10
   minHeight: 0.3
   maxHeight: 0.5
   treeHeightOffset: -0.5

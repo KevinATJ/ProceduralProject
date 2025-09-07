@@ -3,58 +3,49 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
+[System.Serializable]
+public class LRule
+{
+    public char symbol;
+    public string replacement;
+}
+
+[System.Serializable]
+public class LSystemRuleSet
+{
+    public string name = "Tipo de árbol";
+    public string axiom = "X";
+    public int iterations = 4;
+    public float angle = 28f;
+    public float branchScaleY = 1f;
+    public List<LRule> rulesList = new List<LRule>();
+}
+
 public class LSystemGenerator : MonoBehaviour
 {
-    public int iterations = 4;
-    public string axiom = "X";
-    public Dictionary<char, string> rules;
-    private List<Dictionary<char, string>> treeRulesList;
+    public List<LSystemRuleSet> treeTypes = new List<LSystemRuleSet>();
 
-    void Awake()
+    public string GenerateSentence(int treeTypeIndex)
     {
-        Dictionary<char, string> rules1 = new Dictionary<char, string>
-        {
-            { 'X', "F[+X][-X]FXL" },
-            { 'F', "FF" }
-        };
+        if (treeTypeIndex < 0 || treeTypeIndex >= treeTypes.Count)
+            treeTypeIndex = 0;
 
-        Dictionary<char, string> rules2 = new Dictionary<char, string>
-        {
-            { 'X', "FF[+X]F[-X]FFXL" },
-            { 'F', "F" }
-        };
+        var ruleSet = treeTypes[treeTypeIndex];
+        var rules = new Dictionary<char, string>();
+        foreach (var rule in ruleSet.rulesList)
+            rules[rule.symbol] = rule.replacement;
 
-        Dictionary<char, string> rules3 = new Dictionary<char, string>
-        {
-            { 'X', "F[+X]FXL" },
-            { 'F', "F-F" }
-        };
+        string current = ruleSet.axiom;
+        var sb = new StringBuilder();
 
-        treeRulesList = new List<Dictionary<char, string>>
-        {
-            rules1,
-            rules2,
-            rules3
-        };
-    }
-
-    public string GenerateSentence()
-    {
-        int randomIndex = Random.Range(0, treeRulesList.Count);
-        rules = treeRulesList[randomIndex];
-
-        string current = axiom;
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < ruleSet.iterations; i++)
         {
             sb.Clear();
             foreach (char c in current)
-            {
                 sb.Append(rules.ContainsKey(c) ? rules[c] : c.ToString());
-            }
             current = sb.ToString();
         }
         return current;
     }
 }
+
