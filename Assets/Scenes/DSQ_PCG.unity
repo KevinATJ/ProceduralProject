@@ -264,11 +264,38 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   algorithm: 0
-  size: 7
+  size: 9
   xScale: 1
   yScale: 1
   heightScale: 20
-  roughness: 0.9
+  roughness: 0.7
+  terrainType: 1
+  normalMaterials:
+  - {fileID: 2100000, guid: ab1d24b4d83c461418ec2e3862c7afd1, type: 2}
+  - {fileID: 2100000, guid: 79bee0ad00e0fb64f837046fe355bd09, type: 2}
+  - {fileID: 2100000, guid: 1833a1714094003478a993cc9174cf18, type: 2}
+  - {fileID: 2100000, guid: da1d3c65492af4647aff67f3a9e85371, type: 2}
+  - {fileID: 2100000, guid: 9646a7ff0dbe98e43a4a19167281dd20, type: 2}
+  normalThresholds:
+  - 0.25
+  - 0.35
+  - 0.5
+  - 0.8
+  - 1
+  volcanicMaterials:
+  - {fileID: 2100000, guid: 8471ec58c99d942478ac15620ebe10d1, type: 2}
+  - {fileID: 2100000, guid: ee3e814f7a3221f46b05b52b368b089d, type: 2}
+  - {fileID: 2100000, guid: f67384bdd7f3a6240ac1e1d01ad3950f, type: 2}
+  - {fileID: 2100000, guid: 52112c67a7fd99f4598451cfd4d8bd95, type: 2}
+  - {fileID: 2100000, guid: b5f799ae885a77f4ebcf0c1ef817488b, type: 2}
+  - {fileID: 2100000, guid: 7e859a49dc989d6459e2daadf5cbbba3, type: 2}
+  volcanicThresholds:
+  - 0.18
+  - 0.25
+  - 0.35
+  - 0.55
+  - 0.75
+  - 1
 --- !u!23 &633775776
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -506,9 +533,7 @@ MonoBehaviour:
   terrainScript: {fileID: 633775775}
   lSystemGenerator: {fileID: 1467266157}
   treeBuilderPrefab: {fileID: 3090340651783224924, guid: 53eaf5cef124edc4ab9ff794950f4a57, type: 3}
-  treeCount: 10
-  minHeight: 0.3
-  maxHeight: 0.5
+  treeCount: 20
   treeHeightOffset: -0.5
 --- !u!4 &1467266159
 Transform:

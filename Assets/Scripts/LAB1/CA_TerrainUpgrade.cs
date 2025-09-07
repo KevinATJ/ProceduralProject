@@ -4,9 +4,16 @@ using UnityEngine;
 
 public class CA_TerrainUpgrade
 {
-    private const float WATER_LEVEL = 0.25f;
-    private const float SAND_LEVEL = 0.35f;
-    private const float GRASS_LEVEL = 0.5f;
+    private float waterLevel;
+    private float sandLevel;
+    private float grassLevel;
+
+    public CA_TerrainUpgrade(TerrainConfig config)
+    {
+        waterLevel = config.waterLevel;
+        sandLevel = config.sandLevel;
+        grassLevel = config.grassLevel;
+    }
 
     public float[,] ApplyCA(float[,] heightMap, int iterations = 5, int radius = 1)
     {
@@ -23,11 +30,11 @@ public class CA_TerrainUpgrade
                 {
                     float value = heightMap[z, x];
 
-                    if (value < WATER_LEVEL)
+                    if (value < waterLevel)
                     {
                         newMap[z, x] = AverageWater(heightMap, x, z, radius);
                     }
-                    else if ((value >= WATER_LEVEL && value < GRASS_LEVEL) && TouchesWater(heightMap, x, z, radius))
+                    else if ((value >= waterLevel && value < grassLevel) && TouchesWater(heightMap, x, z, radius))
                     {
                         newMap[z, x] = AverageNeighbors(heightMap, x, z, radius);
                     }
@@ -82,7 +89,7 @@ public class CA_TerrainUpgrade
                 if (nx < 0 || nz < 0 || nx >= width || nz >= height)
                     continue;
 
-                if (map[nz, nx] < WATER_LEVEL)
+                if (map[nz, nx] < waterLevel)
                 {
                     sum += map[nz, nx];
                     count++;
@@ -109,7 +116,7 @@ public class CA_TerrainUpgrade
                 if (nx < 0 || nz < 0 || nx >= width || nz >= height)
                     continue;
 
-                if (map[nz, nx] < WATER_LEVEL)
+                if (map[nz, nx] < waterLevel)
                     return true;
             }
         }

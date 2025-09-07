@@ -10,9 +10,11 @@ public class TreeSpawner : MonoBehaviour
 
     [Header("Tree Placement Settings")]
     public int treeCount = 20;
-    public float minHeight = 0.3f;
-    public float maxHeight = 0.5f;
     public float treeHeightOffset = -0.5f;
+
+    private float minHeight;
+    private float maxHeight;
+
     private void Awake()
     {
         if (terrainScript == null || lSystemGenerator == null || treeBuilderPrefab == null)
@@ -20,8 +22,14 @@ public class TreeSpawner : MonoBehaviour
             return;
         }
 
-        
+        TerrainConfig config = terrainScript.terrainType == DS_Terrain.TerrainType.Normal
+            ? terrainScript.normalConfig
+            : terrainScript.volcanicConfig;
+
+        minHeight = config.minHeight;
+        maxHeight = config.maxHeight;
     }
+
     private void Start()
     {
         SpawnTrees();

@@ -6,6 +6,7 @@ using UnityEngine;
 public class DS_Terrain : MonoBehaviour
 {
     public enum AlgorithmType { Recursive, Iterative }
+    public enum TerrainType { Normal, Volcanic }
 
     [Header("Diamond-Square Settings")]
     public AlgorithmType algorithm = AlgorithmType.Recursive;
@@ -19,11 +20,30 @@ public class DS_Terrain : MonoBehaviour
     float[,] heightMap;
     float[,] newHeightMap;
 
+    public TerrainConfig normalConfig = new TerrainConfig(
+    20f, 0.7f, 0.35f, 0.5f, 0.25f, 0.35f, 0.5f
+);
+
+    public TerrainConfig volcanicConfig = new TerrainConfig(
+        40f, 0.7f, 0.15f, 0.25f, 0.15f, 0.25f, 0.35f
+    );
+
+    public TerrainType terrainType = TerrainType.Normal;
+
+    public Material[] normalMaterials;
+    public float[] normalThresholds;
+
+    public Material[] volcanicMaterials;
+    public float[] volcanicThresholds;
+
     void Awake()
     {
         size = (int)Mathf.Pow(2, size) + 1;
         meshFilter = GetComponent<MeshFilter>();
 
+        TerrainConfig config = terrainType == TerrainType.Normal ? normalConfig : volcanicConfig;
+        heightScale = config.heightScale;
+        roughness = config.roughness;
 
 
         if (algorithm == AlgorithmType.Iterative)
@@ -43,11 +63,12 @@ public class DS_Terrain : MonoBehaviour
 
     private void Start()
     {
-       CA_TerrainUpgrade caGenerator = new CA_TerrainUpgrade();
-       heightMap = caGenerator.ApplyCA(heightMap, 20);
-       newHeightMap = heightMap;
-       Mesh mesh = BuildMesh(newHeightMap);
-       meshFilter.mesh = mesh;
+        TerrainConfig config = terrainType == TerrainType.Normal ? normalConfig : volcanicConfig;
+        CA_TerrainUpgrade caGenerator = new CA_TerrainUpgrade(config);
+        heightMap = caGenerator.ApplyCA(heightMap, 20);
+        newHeightMap = heightMap;
+        Mesh mesh = BuildMesh(newHeightMap);
+        meshFilter.mesh = mesh;
     }
 
     Mesh BuildMesh(float[,] heightMap)
@@ -57,8 +78,25 @@ public class DS_Terrain : MonoBehaviour
 
         Vector3[] vertices = new Vector3[width * height];
         Vector2[] uv = new Vector2[vertices.Length];
-        int[] triangles = new int[(width - 1) * (height - 1) * 6];
-        Color[] colors = new Color[vertices.Length];
+
+        List<int>[] submeshTriangles;
+        Material[] materials;
+        float[] thresholds;
+
+        if (terrainType == TerrainType.Normal)
+        {
+            materials = normalMaterials;
+            thresholds = normalThresholds;
+        }
+        else
+        {
+            materials = volcanicMaterials;
+            thresholds = volcanicThresholds;
+        }
+
+        submeshTriangles = new List<int>[materials.Length];
+        for (int i = 0; i < submeshTriangles.Length; i++)
+            submeshTriangles[i] = new List<int>();
 
         int vertIndex = 0;
         for (int z = 0; z < height; z++)
@@ -68,12 +106,10 @@ public class DS_Terrain : MonoBehaviour
                 float y = heightMap[z, x] * heightScale;
                 vertices[vertIndex] = new Vector3(x * xScale, y, z * yScale);
                 uv[vertIndex] = new Vector2((float)x / (width - 1), (float)z / (height - 1));
-                colors[vertIndex] = GetColorByHeight(y / heightScale);
                 vertIndex++;
             }
         }
 
-        int triIndex = 0;
         for (int z = 0; z < height - 1; z++)
         {
             for (int x = 0; x < width - 1; x++)
@@ -83,13 +119,17 @@ public class DS_Terrain : MonoBehaviour
                 int bottomLeft = topLeft + width;
                 int bottomRight = bottomLeft + 1;
 
-                triangles[triIndex++] = topLeft;
-                triangles[triIndex++] = bottomLeft;
-                triangles[triIndex++] = topRight;
+                float avgH1 = (heightMap[z, x] + heightMap[z + 1, x] + heightMap[z, x + 1]) / 3f;
+                int matIndex1 = GetMaterialIndex(avgH1, thresholds);
+                submeshTriangles[matIndex1].Add(topLeft);
+                submeshTriangles[matIndex1].Add(bottomLeft);
+                submeshTriangles[matIndex1].Add(topRight);
 
-                triangles[triIndex++] = topRight;
-                triangles[triIndex++] = bottomLeft;
-                triangles[triIndex++] = bottomRight;
+                float avgH2 = (heightMap[z, x + 1] + heightMap[z + 1, x] + heightMap[z + 1, x + 1]) / 3f;
+                int matIndex2 = GetMaterialIndex(avgH2, thresholds);
+                submeshTriangles[matIndex2].Add(topRight);
+                submeshTriangles[matIndex2].Add(bottomLeft);
+                submeshTriangles[matIndex2].Add(bottomRight);
             }
         }
 
@@ -97,26 +137,49 @@ public class DS_Terrain : MonoBehaviour
         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         mesh.vertices = vertices;
         mesh.uv = uv;
-        mesh.triangles = triangles;
-        mesh.colors = colors;
+
+        mesh.subMeshCount = materials.Length;
+        for (int i = 0; i < materials.Length; i++)
+            mesh.SetTriangles(submeshTriangles[i].ToArray(), i);
 
         mesh.Optimize();
         mesh.RecalculateNormals();
         mesh.RecalculateTangents();
         mesh.RecalculateBounds();
 
+        meshFilter.GetComponent<MeshRenderer>().materials = materials;
+
         return mesh;
     }
 
-    Color GetColorByHeight(float h)
+    int GetMaterialIndex(float h, float[] thresholds)
     {
-        //float rounded = Mathf.Round(h * 100f) / 100f;
-        if (h < 0.25f) return Color.blue;
-        else if (h < 0.35f) return Color.yellow;
-        else if (h < 0.5f) return Color.green;
-        else if (h < 0.7f) return Color.grey;
-        else return Color.white;
+        for (int i = 0; i < thresholds.Length; i++)
+            if (h < thresholds[i]) return i;
+        return thresholds.Length - 1;
     }
+
+    /*Color GetColorByHeight(float h)
+    {
+        if (terrainType == TerrainType.Normal)
+        {
+            if (h < 0.25f) return Color.blue;
+            else if (h < 0.35f) return Color.yellow;
+            else if (h < 0.5f) return Color.green;
+            else if (h < 0.7f) return Color.grey;
+            else return Color.white;
+        }
+        else
+        {
+            if (h < 0.12f) return new Color(0.15f, 0.07f, 0.03f);
+            else if (h < 0.18f) return new Color(0.3f, 0.15f, 0.05f);
+            else if (h < 0.25f) return new Color(0.5f, 0.2f, 0.1f);
+            else if (h < 0.35f) return new Color(0.7f, 0.3f, 0.1f);
+            else if (h < 0.55f) return Color.grey;
+            else if (h < 0.75f) return new Color(0.9f, 0.3f, 0.1f);
+            else return Color.black;
+        }
+    }*/
 
     public float[,] returnHeighMap()
     {
