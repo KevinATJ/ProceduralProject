@@ -47,3 +47,8 @@ MonoBehaviour:
   branchPrefab: {fileID: 2737666220699860076, guid: 1392adb6b83e9c641aef386a9a450933, type: 3}
   leafPrefab: {fileID: 6305827462893811019, guid: 27cdb95388150eb46a7e0159f0e174c7, type: 3}
   angle: 35
+  branchScaleY: 1
+  normalTrunkMaterial: {fileID: 2100000, guid: f570dbe9284d48d4f8fb94698ee3524b, type: 2}
+  normalLeafMaterial: {fileID: 2100000, guid: 15fc4b30702efbe408c1b3c468f94613, type: 2}
+  volcanicTrunkMaterial: {fileID: 2100000, guid: 42473b19a411cd54d91ecb5b492bb8a7, type: 2}
+  volcanicLeafMaterial: {fileID: 2100000, guid: 9adb65c56e80204418a95fd4ec4b2e07, type: 2}

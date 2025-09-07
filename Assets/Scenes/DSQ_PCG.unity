@@ -264,12 +264,30 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   algorithm: 0
-  size: 9
-  xScale: 1
-  yScale: 1
+  mapSize: 9
+  mapX_Scale: 1
+  mapY_Scale: 1
+  CA_iterations: 5
+  CA_neighborhood: 4
   heightScale: 20
   roughness: 0.7
-  terrainType: 1
+  normalConfig:
+    heightScale: 20
+    roughness: 0.7
+    treePosMinHeight: 0.35
+    treePosMaxHeight: 0.5
+    worldWaterLevel: 0.25
+    worldSandLevel: 0.35
+    worldGrassLevel: 0.5
+  volcanicConfig:
+    heightScale: 40
+    roughness: 0.7
+    treePosMinHeight: 0
+    treePosMaxHeight: 0.35
+    worldWaterLevel: 0.25
+    worldSandLevel: 0.35
+    worldGrassLevel: 0.5
+  terrainType: 0
   normalMaterials:
   - {fileID: 2100000, guid: ab1d24b4d83c461418ec2e3862c7afd1, type: 2}
   - {fileID: 2100000, guid: 79bee0ad00e0fb64f837046fe355bd09, type: 2}
@@ -356,6 +374,52 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1201473295
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1201473297}
+  - component: {fileID: 1201473296}
+  m_Layer: 0
+  m_Name: Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1201473296
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1201473295}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3442ce603832a324186d5c2852c4fdde, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  terrain: {fileID: 633775775}
+  treeSpawner: {fileID: 1467266158}
+--- !u!4 &1201473297
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1201473295}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.027306272, y: -0.021642514, z: 0.118857846}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -686,3 +750,4 @@ SceneRoots:
   - {fileID: 1467266159}
   - {fileID: 173248417202437674}
   - {fileID: 8287779050548310846}
+  - {fileID: 1201473297}

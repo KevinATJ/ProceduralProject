@@ -7,13 +7,21 @@ public class TreeBuilder : MonoBehaviour
 {
     public GameObject branchPrefab;
     public GameObject leafPrefab;
-    public float angle = 28f;
-    public float branchScaleY = 1f;
+    [HideInInspector] public float angle;
+    [HideInInspector] public float branchScaleY;
 
     float branchLength;
     float leafLength;
 
     private Stack<TransformInfo> transformStack;
+
+    public Material normalTrunkMaterial;
+    public Material normalLeafMaterial;
+    public Material volcanicTrunkMaterial;
+    public Material volcanicLeafMaterial;
+
+    private Material currentTrunkMaterial;
+    private Material currentLeafMaterial;
 
     public void Awake()
     {
@@ -24,7 +32,20 @@ public class TreeBuilder : MonoBehaviour
 
     private void Start()
     {
-       
+
+    }
+    public void SetMaterials(DS_Terrain.TerrainType terrainType)
+    {
+        if (terrainType == DS_Terrain.TerrainType.Normal)
+        {
+            currentTrunkMaterial = normalTrunkMaterial;
+            currentLeafMaterial = normalLeafMaterial;
+        }
+        else
+        {
+            currentTrunkMaterial = volcanicTrunkMaterial;
+            currentLeafMaterial = volcanicLeafMaterial;
+        }
     }
 
     public void DrawTree(string lSystemSentence)
@@ -46,6 +67,9 @@ public class TreeBuilder : MonoBehaviour
                         branchPrefab.transform.localScale.y * branchScaleY,
                         branch.transform.localScale.z
                     );
+                    var branchRenderer = branch.GetComponent<MeshRenderer>();
+                    if (branchRenderer != null && currentTrunkMaterial != null)
+                        branchRenderer.material = currentTrunkMaterial;
 
                     initialPos = branchPos;
                     break;
@@ -83,6 +107,9 @@ public class TreeBuilder : MonoBehaviour
                     GameObject leaf = Instantiate(leafPrefab, transform);
                     leaf.transform.localPosition = leafPos;
                     leaf.transform.localRotation = rotation;
+                    var leafRenderer = leaf.GetComponent<MeshRenderer>();
+                    if (leafRenderer != null && currentLeafMaterial != null)
+                        leafRenderer.material = currentLeafMaterial;
                     break;
             }
         }

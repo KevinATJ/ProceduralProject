@@ -10,12 +10,12 @@ public class CA_TerrainUpgrade
 
     public CA_TerrainUpgrade(TerrainConfig config)
     {
-        waterLevel = config.waterLevel;
-        sandLevel = config.sandLevel;
-        grassLevel = config.grassLevel;
+        waterLevel = config.worldWaterLevel;
+        sandLevel = config.worldSandLevel;
+        grassLevel = config.worldGrassLevel;
     }
 
-    public float[,] ApplyCA(float[,] heightMap, int iterations = 5, int radius = 1)
+    public float[,] ApplyCA(float[,] heightMap, int iterations = 1, int radius = 1)
     {
         int width = heightMap.GetLength(0);
         int height = heightMap.GetLength(1);

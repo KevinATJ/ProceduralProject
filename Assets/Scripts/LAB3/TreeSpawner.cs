@@ -15,6 +15,7 @@ public class TreeSpawner : MonoBehaviour
     private float minHeight;
     private float maxHeight;
 
+
     private void Awake()
     {
         if (terrainScript == null || lSystemGenerator == null || treeBuilderPrefab == null)
@@ -26,8 +27,8 @@ public class TreeSpawner : MonoBehaviour
             ? terrainScript.normalConfig
             : terrainScript.volcanicConfig;
 
-        minHeight = config.minHeight;
-        maxHeight = config.maxHeight;
+        minHeight = config.treePosMinHeight;
+        maxHeight = config.treePosMaxHeight;
     }
 
     private void Start()
@@ -66,22 +67,21 @@ public class TreeSpawner : MonoBehaviour
             float hNormalized = heightMap[z, x];
             float treeY = hNormalized * terrainScript.heightScale + treeHeightOffset;
 
-            Vector3 pos = new Vector3(x * terrainScript.xScale, treeY, z * terrainScript.yScale);
+            Vector3 pos = new Vector3(x * terrainScript.mapX_Scale, treeY, z * terrainScript.mapY_Scale);
             pos += terrainPosition;
 
-            GameObject treeParent = Instantiate(treeBuilderPrefab, pos, Quaternion.identity);
+            GameObject treeParent = Instantiate(treeBuilderPrefab, pos, Quaternion.identity, transform);
 
-            // Selecciona un tipo de árbol aleatorio
             int treeTypeIndex = Random.Range(0, lSystemGenerator.treeTypes.Count);
             string treeSentence = lSystemGenerator.GenerateSentence(treeTypeIndex);
 
             TreeBuilder builder = treeParent.GetComponent<TreeBuilder>();
             if (builder != null)
             {
-                // Asigna el ángulo y las escalas del tipo de árbol
                 var ruleSet = lSystemGenerator.treeTypes[treeTypeIndex];
                 builder.angle = ruleSet.angle;
                 builder.branchScaleY = ruleSet.branchScaleY;
+                builder.SetMaterials(terrainScript.terrainType);
                 builder.Awake();
                 builder.DrawTree(treeSentence);
             }
@@ -97,5 +97,21 @@ public class TreeSpawner : MonoBehaviour
             list[i] = list[randomIndex];
             list[randomIndex] = temp;
         }
+    }
+
+    public void RegenerateTrees()
+    {
+        TerrainConfig config = terrainScript.terrainType == DS_Terrain.TerrainType.Normal
+            ? terrainScript.normalConfig
+            : terrainScript.volcanicConfig;
+
+        minHeight = config.treePosMinHeight;
+        maxHeight = config.treePosMaxHeight;
+
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            DestroyImmediate(transform.GetChild(i).gameObject);
+        }
+        SpawnTrees();
     }
 }

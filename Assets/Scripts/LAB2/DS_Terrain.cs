@@ -10,9 +10,14 @@ public class DS_Terrain : MonoBehaviour
 
     [Header("Diamond-Square Settings")]
     public AlgorithmType algorithm = AlgorithmType.Recursive;
-    public int size = 7;
-    public float xScale = 1f;
-    public float yScale = 1f;
+    public int mapSize = 7;
+    public float mapX_Scale = 1f;
+    public float mapY_Scale = 1f;
+    [Header("CA Settings")]
+    public int CA_iterations = 5;
+    public int CA_neighborhood = 1;
+
+    [HideInInspector]
     public float heightScale = 20f;
     public float roughness = 0.7f;
 
@@ -20,13 +25,8 @@ public class DS_Terrain : MonoBehaviour
     float[,] heightMap;
     float[,] newHeightMap;
 
-    public TerrainConfig normalConfig = new TerrainConfig(
-    20f, 0.7f, 0.35f, 0.5f, 0.25f, 0.35f, 0.5f
-);
-
-    public TerrainConfig volcanicConfig = new TerrainConfig(
-        40f, 0.7f, 0.15f, 0.25f, 0.15f, 0.25f, 0.35f
-    );
+    public TerrainConfig normalConfig = new TerrainConfig();
+    public TerrainConfig volcanicConfig = new TerrainConfig();
 
     public TerrainType terrainType = TerrainType.Normal;
 
@@ -38,7 +38,7 @@ public class DS_Terrain : MonoBehaviour
 
     void Awake()
     {
-        size = (int)Mathf.Pow(2, size) + 1;
+        mapSize = (int)Mathf.Pow(2, mapSize) + 1;
         meshFilter = GetComponent<MeshFilter>();
 
         TerrainConfig config = terrainType == TerrainType.Normal ? normalConfig : volcanicConfig;
@@ -48,13 +48,13 @@ public class DS_Terrain : MonoBehaviour
 
         if (algorithm == AlgorithmType.Iterative)
         {
-            DS_PCG_Script dsIter = new DS_PCG_Script(size, roughness);
+            DS_PCG_Script dsIter = new DS_PCG_Script(mapSize, roughness);
             dsIter.GenerateHeightmap();
             heightMap = dsIter.GetHeightMap();
         }
         else
         {
-            DS_PCG_Script_Rec dsRec = new DS_PCG_Script_Rec(size, roughness);
+            DS_PCG_Script_Rec dsRec = new DS_PCG_Script_Rec(mapSize, roughness);
             dsRec.GenerateHeightmap();
             heightMap = dsRec.GetHeightMap();
         }
@@ -65,7 +65,7 @@ public class DS_Terrain : MonoBehaviour
     {
         TerrainConfig config = terrainType == TerrainType.Normal ? normalConfig : volcanicConfig;
         CA_TerrainUpgrade caGenerator = new CA_TerrainUpgrade(config);
-        heightMap = caGenerator.ApplyCA(heightMap, 20);
+        heightMap = caGenerator.ApplyCA(heightMap, CA_iterations, CA_neighborhood);
         newHeightMap = heightMap;
         Mesh mesh = BuildMesh(newHeightMap);
         meshFilter.mesh = mesh;
@@ -104,7 +104,7 @@ public class DS_Terrain : MonoBehaviour
             for (int x = 0; x < width; x++)
             {
                 float y = heightMap[z, x] * heightScale;
-                vertices[vertIndex] = new Vector3(x * xScale, y, z * yScale);
+                vertices[vertIndex] = new Vector3(x * mapX_Scale, y, z * mapY_Scale);
                 uv[vertIndex] = new Vector2((float)x / (width - 1), (float)z / (height - 1));
                 vertIndex++;
             }
@@ -184,5 +184,32 @@ public class DS_Terrain : MonoBehaviour
     public float[,] returnHeighMap()
     {
         return newHeightMap;
+    }
+
+    public void RegenerateTerrain(TerrainType type)
+    {
+        terrainType = type;
+        TerrainConfig config = terrainType == TerrainType.Normal ? normalConfig : volcanicConfig;
+        heightScale = config.heightScale;
+        roughness = config.roughness;
+
+        if (algorithm == AlgorithmType.Iterative)
+        {
+            DS_PCG_Script dsIter = new DS_PCG_Script(mapSize, roughness);
+            dsIter.GenerateHeightmap();
+            heightMap = dsIter.GetHeightMap();
+        }
+        else
+        {
+            DS_PCG_Script_Rec dsRec = new DS_PCG_Script_Rec(mapSize, roughness);
+            dsRec.GenerateHeightmap();
+            heightMap = dsRec.GetHeightMap();
+        }
+
+        CA_TerrainUpgrade caGenerator = new CA_TerrainUpgrade(config);
+        heightMap = caGenerator.ApplyCA(heightMap, 20);
+        newHeightMap = heightMap;
+        Mesh mesh = BuildMesh(newHeightMap);
+        meshFilter.mesh = mesh;
     }
 }
