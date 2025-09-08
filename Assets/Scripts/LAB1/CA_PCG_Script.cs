@@ -18,7 +18,7 @@ public class CA_PCG_Script : MonoBehaviour
     [SerializeField] int roomWidth = 50;
     [SerializeField] int roomHeight = 50;
 
-    [SerializeField] int iterations = 4;
+    [SerializeField] public int iterations = 4;
 
     [SerializeField] double noiseDensity = 0.45;
 

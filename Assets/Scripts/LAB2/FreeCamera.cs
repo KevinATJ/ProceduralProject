@@ -26,6 +26,9 @@ public class FreeCamera : MonoBehaviour
 
     void Update()
     {
+        if (SettingsMenuManager.IsMenuOpen)
+            return;
+
         HandleMouse();
         HandleMovement();
     }

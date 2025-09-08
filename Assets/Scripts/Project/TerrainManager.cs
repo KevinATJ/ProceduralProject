@@ -8,7 +8,10 @@ public class TerrainManager : MonoBehaviour
     public TreeSpawner treeSpawner;
 
     void Update()
-    {
+    {   
+        if (SettingsMenuManager.IsMenuOpen)
+            return;
+
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
             terrain.RegenerateTerrain(DS_Terrain.TerrainType.Normal);

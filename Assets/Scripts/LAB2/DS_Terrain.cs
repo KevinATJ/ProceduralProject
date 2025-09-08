@@ -10,7 +10,8 @@ public class DS_Terrain : MonoBehaviour
 
     [Header("Diamond-Square Settings")]
     public AlgorithmType algorithm = AlgorithmType.Recursive;
-    public int mapSize = 7;
+    public int mapSizeExponent = 7;
+    private int mapSize;
     public float mapX_Scale = 1f;
     public float mapY_Scale = 1f;
     [Header("CA Settings")]
@@ -38,7 +39,7 @@ public class DS_Terrain : MonoBehaviour
 
     void Awake()
     {
-        mapSize = (int)Mathf.Pow(2, mapSize) + 1;
+        mapSize = (int)Mathf.Pow(2, mapSizeExponent) + 1;
         meshFilter = GetComponent<MeshFilter>();
 
         TerrainConfig config = terrainType == TerrainType.Normal ? normalConfig : volcanicConfig;
@@ -190,8 +191,10 @@ public class DS_Terrain : MonoBehaviour
     {
         terrainType = type;
         TerrainConfig config = terrainType == TerrainType.Normal ? normalConfig : volcanicConfig;
+
         heightScale = config.heightScale;
-        roughness = config.roughness;
+
+        mapSize = (int)Mathf.Pow(2, mapSizeExponent) + 1;
 
         if (algorithm == AlgorithmType.Iterative)
         {
@@ -207,7 +210,7 @@ public class DS_Terrain : MonoBehaviour
         }
 
         CA_TerrainUpgrade caGenerator = new CA_TerrainUpgrade(config);
-        heightMap = caGenerator.ApplyCA(heightMap, 20);
+        heightMap = caGenerator.ApplyCA(heightMap, CA_iterations, CA_neighborhood);
         newHeightMap = heightMap;
         Mesh mesh = BuildMesh(newHeightMap);
         meshFilter.mesh = mesh;
