@@ -1,5 +1,7 @@
 # Generación Procedural de Terrenos en Unity
 
+## Creado por Kevin Troncoso y José Peña
+
 ## 1) Detalles del proyecto
 Este proyecto implementa un sistema de generación procedural de terrenos en Unity.  
 El objetivo de este es la posibilidad de generar dos mapas:
