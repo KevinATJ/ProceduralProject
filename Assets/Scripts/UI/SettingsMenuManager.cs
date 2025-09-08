@@ -8,6 +8,7 @@ public class SettingsMenuManager : MonoBehaviour
     public TreeSpawner treeSpawner;
 
     public InputField mapSizeExponentInput;
+    public InputField heightScaleInput;
     public InputField mapXScaleInput;
     public InputField mapYScaleInput;
     public InputField caIterationsInput;
@@ -23,6 +24,7 @@ public class SettingsMenuManager : MonoBehaviour
         menuPanel.SetActive(false);
 
         mapSizeExponentInput.text = dsTerrain.mapSizeExponent.ToString();
+        heightScaleInput.text = dsTerrain.heightScale.ToString();
         mapXScaleInput.text = dsTerrain.mapX_Scale.ToString();
         mapYScaleInput.text = dsTerrain.mapY_Scale.ToString();
         caIterationsInput.text = dsTerrain.CA_iterations.ToString();
@@ -49,6 +51,8 @@ public class SettingsMenuManager : MonoBehaviour
     {
         if (int.TryParse(mapSizeExponentInput.text, out int mapSizeExponent))
             dsTerrain.mapSizeExponent = mapSizeExponent;
+        if (float.TryParse(heightScaleInput.text, out float heightScale))
+            dsTerrain.heightScale = heightScale;
         if (float.TryParse(mapXScaleInput.text, out float mapXScale))
             dsTerrain.mapX_Scale = mapXScale;
         if (float.TryParse(mapYScaleInput.text, out float mapYScale))

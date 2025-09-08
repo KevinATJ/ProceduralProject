@@ -192,7 +192,7 @@ public class DS_Terrain : MonoBehaviour
         terrainType = type;
         TerrainConfig config = terrainType == TerrainType.Normal ? normalConfig : volcanicConfig;
 
-        heightScale = config.heightScale;
+        //heightScale = config.heightScale;
 
         mapSize = (int)Mathf.Pow(2, mapSizeExponent) + 1;
 
