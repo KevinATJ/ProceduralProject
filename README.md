@@ -38,5 +38,3 @@ El objetivo de este es la posibilidad de generar dos mapas:
 3. Presiona tecla [ESC] para modificar los algoritmos y el mapa.
 
 
-   ```bash
-   git clone https://github.com/usuario/tu-proyecto-terreno.git
