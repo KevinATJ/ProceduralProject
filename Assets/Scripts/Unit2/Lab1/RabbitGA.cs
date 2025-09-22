@@ -23,9 +23,12 @@ public class RabbitGA : MonoBehaviour
 
     private EcosystemManager manager;
 
+    private Renderer rend;
+
     void Awake()
     {
         manager = FindObjectOfType<EcosystemManager>();
+        rend = GetComponent<Renderer>();
     }
 
     void Start()
@@ -156,6 +159,22 @@ public class RabbitGA : MonoBehaviour
             }
         }
         return closest;
+    }
+
+    public void UpdateColor(float maxSpeed, float maxAwareness)
+    {
+        float normalizedSpeed = speed / maxSpeed;
+        float normalizedAwareness = awareness / maxAwareness;
+
+        normalizedSpeed = Mathf.Clamp01(normalizedSpeed);
+        normalizedAwareness = Mathf.Clamp01(normalizedAwareness);
+
+        Color newColor = new Color(0, normalizedSpeed*2, normalizedAwareness);
+
+        if (rend != null && rend.material != null)
+        {
+            rend.material.color = newColor;
+        }
     }
 
     public void ResetAgent()

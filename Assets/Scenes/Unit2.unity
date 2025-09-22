@@ -2401,8 +2401,8 @@ MonoBehaviour:
   rabbitPrefab: {fileID: 1274428122789635753, guid: 87c4a69769638874f9abcf883ab54f3e, type: 3}
   wolfPrefab: {fileID: 549531965619354140, guid: 23eeb085b671f2342882c43c19094b84, type: 3}
   initialRabbitPopulation: 20
-  initialWolfPopulation: 4
-  generationTime: 20
+  initialWolfPopulation: 6
+  generationTime: 30
   mutationStrength: 1
   fixedWolfSpeed: 5
   fixedWolfAwareness: 10
@@ -2414,6 +2414,9 @@ MonoBehaviour:
   maxArrivalBonus: 500
   arrivalPenaltyPerRabbit: 10
   speedBonusFactor: 5000
+  speedTime: 5
+  maxSpeedForColor: 30
+  maxAwarenessForColor: 30
 --- !u!4 &800499385
 Transform:
   m_ObjectHideFlags: 0

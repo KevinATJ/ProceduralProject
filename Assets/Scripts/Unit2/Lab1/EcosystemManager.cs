@@ -35,8 +35,14 @@ public class EcosystemManager : MonoBehaviour
 
     private int rabbitsThatReachedCave = 0;
 
+    public float speedTime = 1f;
+
+    public float maxSpeedForColor = 30f;
+    public float maxAwarenessForColor = 30f;
+
     void Start()
     {
+        Time.timeScale = speedTime;
 
         rabbits = new List<RabbitGA>();
         wolves = new List<WolfGA>();
@@ -63,13 +69,13 @@ public class EcosystemManager : MonoBehaviour
 
         float arrivalBonus = Mathf.Max(0, maxArrivalBonus - (rabbitsThatReachedCave - 1) * arrivalPenaltyPerRabbit);
 
-        float timeEfficiencyBonus = 0;
+        /*float timeEfficiencyBonus = 0;
         if (rabbit.survivalTime > 0)
         {
             timeEfficiencyBonus = speedBonusFactor / rabbit.survivalTime;
-        }
+        }*/
 
-        rabbit.totalFitness = rabbit.survivalTime + arrivalBonus + timeEfficiencyBonus;
+        rabbit.totalFitness = rabbit.survivalTime + arrivalBonus;// + timeEfficiencyBonus;
     }
 
     public void RabbitCaught(RabbitGA rabbit)
@@ -86,8 +92,9 @@ public class EcosystemManager : MonoBehaviour
             RabbitGA newRabbit = newRabbitGO.GetComponent<RabbitGA>();
 
             newRabbit.speed = Random.Range(1f, 8f);
-            newRabbit.awareness = Random.Range(2f, 15f);
+            newRabbit.awareness = Random.Range(2f, 10f);
             newRabbit.evasionRange = newRabbit.awareness / 2f;
+            newRabbit.UpdateColor(maxSpeedForColor, maxAwarenessForColor);
 
             rabbits.Add(newRabbit);
         }
@@ -105,7 +112,7 @@ public class EcosystemManager : MonoBehaviour
         }
     }
 
-    private void SelectFittestAgents()
+    /*private void SelectFittestAgents()
     {
         rabbits.Sort((a, b) => b.totalFitness.CompareTo(a.totalFitness));
         breedingRabbits.Clear();
@@ -113,6 +120,39 @@ public class EcosystemManager : MonoBehaviour
         for (int i = 0; i < breedingCount; i++)
         {
             breedingRabbits.Add(rabbits[i]);
+        }
+    }*/
+
+    private void SelectFittestAgents()
+    {
+        breedingRabbits.Clear();
+        List<RabbitGA> dominatedRabbits = new List<RabbitGA>();
+
+        foreach (RabbitGA rabbitA in rabbits)
+        {
+            bool isDominated = false;
+            foreach (RabbitGA rabbitB in rabbits)
+            {
+                if (rabbitA == rabbitB) continue;
+
+                if (rabbitB.speed >= rabbitA.speed && rabbitB.awareness >= rabbitA.awareness)
+                {
+                    if (rabbitB.speed > rabbitA.speed || rabbitB.awareness > rabbitA.awareness)
+                    {
+                        isDominated = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!isDominated)
+            {
+                breedingRabbits.Add(rabbitA);
+            }
+            else
+            {
+                dominatedRabbits.Add(rabbitA);
+            }
         }
     }
 
@@ -136,6 +176,8 @@ public class EcosystemManager : MonoBehaviour
             newRabbit.speed = newSpeed;
             newRabbit.awareness = newAwareness;
             newRabbit.evasionRange = newAwareness / 2f;
+
+            newRabbit.UpdateColor(maxSpeedForColor, maxAwarenessForColor);
 
             newRabbits.Add(newRabbit);
         }
