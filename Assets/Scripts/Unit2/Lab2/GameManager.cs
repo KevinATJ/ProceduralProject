@@ -249,62 +249,73 @@ public class GameManager : MonoBehaviour
 
     private State HillClimbing_Generate()
     {
+        
         State currentState = new State(pieces, emptyLocation);
         int currentFitness = CalculateFitness(currentState);
 
+        State bestState = currentState;
+        int bestFitness = currentFitness;
+
+        int[] offsets = { -size, +size, -1, +1 };
+        int[] colChecks = { size, size, 0, size - 1 };
+
         for (int i = 0; i < hillClimbingIterations; i++)
         {
-            State bestNeighbor = null;
+            
+            int offsetIndex = Random.Range(0, offsets.Length);
+            State neighbor = TryGenerateNeighbor(currentState, offsets[offsetIndex], colChecks[offsetIndex]);
 
-            int[] offsets = { -size, +size, -1, +1 };
-            int[] colChecks = { size, size, 0, size - 1 };
-
-            for (int j = 0; j < offsets.Length; j++)
+            if (neighbor != null)
             {
-                State neighbor = TryGenerateNeighbor(currentState, offsets[j], colChecks[j]);
+                int neighborFitness = CalculateFitness(neighbor);
 
-                if (neighbor != null)
+                
+                if (neighborFitness > bestFitness)
                 {
-                    int neighborFitness = CalculateFitness(neighbor);
-
-                    if (bestNeighbor == null || neighborFitness < CalculateFitness(bestNeighbor))
-                    {
-                        bestNeighbor = neighbor;
-                    }
+                    bestFitness = neighborFitness;
+                    bestState = neighbor;
                 }
-            }
 
-            if (bestNeighbor != null)
-            {
-                int bestFitness = CalculateFitness(bestNeighbor);
-
-                if (bestFitness < currentFitness)
-                {
-                    currentState = bestNeighbor;
-                    currentFitness = bestFitness;
-                }
-                else
-                {
-                    break;
-                }
+                
+                currentState = neighbor;
             }
         }
 
-        ApplyStateToGame(currentState);
-        return currentState;
+        
+        ApplyStateToGame(bestState);
+
+        Debug.Log($"Puzzle generado con dificultad (distancia Manhattan total): {bestFitness}");
+        return bestState;
     }
+
     private int CalculateFitness(State state)
     {
-        int correctPieces = 0;
+        int totalDistance = 0;
+
         for (int i = 0; i < state.Order.Length; i++)
         {
-            if (state.Order[i] == $"{i}")
-            {
-                correctPieces++;
-            }
+            // Ignorar la casilla vacía
+            if (state.Order[i] == $"{size * size - 1}")
+                continue;
+
+            int currentIndex = i;
+            int targetIndex = int.Parse(state.Order[i]);
+
+            // Coordenadas actuales
+            int currentRow = currentIndex / size;
+            int currentCol = currentIndex % size;
+
+            // Coordenadas correctas
+            int targetRow = targetIndex / size;
+            int targetCol = targetIndex % size;
+
+            // Sumar distancia Manhattan
+            totalDistance += Mathf.Abs(currentRow - targetRow) + Mathf.Abs(currentCol - targetCol);
         }
-        return correctPieces;
+
+        return totalDistance;
     }
+
 
     private State TryGenerateNeighbor(State parentState, int offset, int colCheck)
     {

@@ -96,7 +96,7 @@ public class WolfGA : MonoBehaviour
 
     public void ResetAgent()
     {
-        rb.velocity = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
         Node node = grid.GetRandomWalkableNode();
         transform.position = node.worldPosition + Vector3.up * 0.5f;
         rabbitsCaught = 0;

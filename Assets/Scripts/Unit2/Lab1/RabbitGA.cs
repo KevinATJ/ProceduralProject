@@ -185,7 +185,7 @@ public class RabbitGA : MonoBehaviour
         gameObject.SetActive(true);
 
         if (rb == null) rb = GetComponent<Rigidbody>();
-        rb.velocity = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
 
         if (grid != null)
         {
