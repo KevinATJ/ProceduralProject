@@ -4,14 +4,50 @@ using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
+    public enum GenerationMethod { GoalBackward, HillClimbing }
+
+    [Header("Puzzle Config")]
     [SerializeField] private Transform gameTransform;
     [SerializeField] private Transform piecePrefab;
     [SerializeField] private int size = 4;
     [SerializeField] private float shuffleTime = 1f;
 
+    [Header("Generation Method")]
+    [SerializeField] private GenerationMethod generationMethod = GenerationMethod.GoalBackward;
+    [SerializeField] private int hillClimbingIterations = 100;
+    [SerializeField] private int goalBackwardIterations = 100;
+
     private List<Transform> pieces;
     private int emptyLocation;
     private bool shuffling = false;
+    private class State
+    {
+        public string[] Order;
+        public int EmptyIndex;
+
+        public State(List<Transform> currentPieces, int emptyLocation)
+        {
+            Order = new string[currentPieces.Count];
+            for (int i = 0; i < currentPieces.Count; i++)
+            {
+                Order[i] = currentPieces[i].name;
+            }
+            EmptyIndex = emptyLocation;
+        }
+
+        public State Clone()
+        {
+            return new State
+            {
+                Order = (string[])Order.Clone(),
+                EmptyIndex = EmptyIndex
+            };
+        }
+
+        public State() { }
+    }
+
+    #region General
 
     private void CreateGamePieces(float gapThickness)
     {
@@ -21,6 +57,10 @@ public class GameManager : MonoBehaviour
         }
         else
         {
+            foreach (Transform piece in pieces)
+            {
+                if (piece != null) Destroy(piece.gameObject);
+            }
             pieces.Clear();
         }
 
@@ -32,12 +72,8 @@ public class GameManager : MonoBehaviour
                 Transform piece = Instantiate(piecePrefab, gameTransform);
                 pieces.Add(piece);
 
-                piece.localPosition = new Vector3(-1 + (2 * width * col) + width,
-                                                  +1 - (2 * width * row) - width,
-                                                  0);
-
+                piece.localPosition = new Vector3(-1 + (2 * width * col) + width, +1 - (2 * width * row) - width, 0);
                 piece.localScale = ((2 * width) - gapThickness) * Vector3.one;
-
                 piece.name = $"{(row * size) + col}";
 
                 if ((row == size - 1) && (col == size - 1))
@@ -59,6 +95,7 @@ public class GameManager : MonoBehaviour
             }
         }
     }
+
     void Start()
     {
         if (size < 2) size = 2;
@@ -67,13 +104,30 @@ public class GameManager : MonoBehaviour
         CreateGamePieces(0.01f);
         StartCoroutine(WaitShuffle(shuffleTime));
     }
+    private IEnumerator WaitShuffle(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+
+        if (generationMethod == GenerationMethod.GoalBackward)
+        {
+            GenerateGoalBackward();
+            DebugPuzzleState();
+        }
+        else if (generationMethod == GenerationMethod.HillClimbing)
+        {
+            State finalState = HillClimbing_Generate();
+            DebugPuzzleState(finalState);
+        }
+
+        shuffling = false;
+    }
 
     void Update()
     {
         if (!shuffling && CheckCompletion())
         {
             shuffling = true;
-            Debug.Log("¡Puzzle Resuelto!");
+            Debug.Log("Puzzle Resuelto");
             StartCoroutine(WaitShuffle(shuffleTime));
         }
 
@@ -100,7 +154,6 @@ public class GameManager : MonoBehaviour
 
     private bool SwapIfValid(int i, int offset, int colCheck)
     {
-
         if (((i % size) != colCheck) && ((i + offset) == emptyLocation))
         {
             (pieces[i], pieces[i + offset]) = (pieces[i + offset], pieces[i]);
@@ -125,39 +178,176 @@ public class GameManager : MonoBehaviour
         return true;
     }
 
-    private IEnumerator WaitShuffle(float duration)
+    private void DebugPuzzleState(State stateToDebug = null)
     {
-        yield return new WaitForSeconds(duration);
-        Shuffle();
-        shuffling = false;
+        string[] order;
+        int N = size * size;
+
+        if (stateToDebug != null)
+        {
+            order = stateToDebug.Order;
+        }
+        else
+        {
+            order = new string[N];
+            for (int i = 0; i < N; i++)
+            {
+                order[i] = pieces[i].name;
+            }
+        }
+
+        string debugMessage = $"\n--- ESTADO FINAL ({generationMethod}) ---\n";
+        debugMessage += $"Tamaño: {size}x{size}\n";
+
+        string sequence = "";
+        for (int i = 0; i < N; i++)
+        {
+            string value = order[i];
+
+            if (order[i] == $"{N - 1}")
+            {
+                value = "  ";
+            }
+
+            sequence += $"{order[i]} ";
+            debugMessage += $"{value.PadLeft(2, ' ')} ";
+            if ((i + 1) % size == 0)
+            {
+                debugMessage += "\n";
+            }
+        }
+
+        debugMessage += $"\nSecuencia de Nombres (Top-Left a Bottom-Right):\n[{sequence.Trim()}]";
+
+        Debug.Log(debugMessage);
     }
 
-    private void Shuffle()
+    #endregion
+
+    #region GOAL BACKWARD
+
+    private void GenerateGoalBackward()
     {
         int count = 0;
         int last = 0;
-        while (count < (size * size * size))
+        while (count < (goalBackwardIterations))
         {
             int rnd = Random.Range(0, size * size);
             if (rnd == last) { continue; }
             last = emptyLocation;
 
-            if (SwapIfValid(rnd, -size, size))
-            {
-                count++;
-            }
-            else if (SwapIfValid(rnd, +size, size))
-            {
-                count++;
-            }
-            else if (SwapIfValid(rnd, -1, 0))
-            {
-                count++;
-            }
-            else if (SwapIfValid(rnd, +1, size - 1))
-            {
-                count++;
-            }
+            if (SwapIfValid(rnd, -size, size)) { count++; }
+            else if (SwapIfValid(rnd, +size, size)) { count++; }
+            else if (SwapIfValid(rnd, -1, 0)) { count++; }
+            else if (SwapIfValid(rnd, +1, size - 1)) { count++; }
         }
     }
+
+    #endregion
+
+    #region HILL CLIMBING
+
+    private State HillClimbing_Generate()
+    {
+        State currentState = new State(pieces, emptyLocation);
+        int currentFitness = CalculateFitness(currentState);
+
+        for (int i = 0; i < hillClimbingIterations; i++)
+        {
+            State bestNeighbor = null;
+
+            int[] offsets = { -size, +size, -1, +1 };
+            int[] colChecks = { size, size, 0, size - 1 };
+
+            for (int j = 0; j < offsets.Length; j++)
+            {
+                State neighbor = TryGenerateNeighbor(currentState, offsets[j], colChecks[j]);
+
+                if (neighbor != null)
+                {
+                    int neighborFitness = CalculateFitness(neighbor);
+
+                    if (bestNeighbor == null || neighborFitness < CalculateFitness(bestNeighbor))
+                    {
+                        bestNeighbor = neighbor;
+                    }
+                }
+            }
+
+            if (bestNeighbor != null)
+            {
+                int bestFitness = CalculateFitness(bestNeighbor);
+
+                if (bestFitness < currentFitness)
+                {
+                    currentState = bestNeighbor;
+                    currentFitness = bestFitness;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        ApplyStateToGame(currentState);
+        return currentState;
+    }
+    private int CalculateFitness(State state)
+    {
+        int correctPieces = 0;
+        for (int i = 0; i < state.Order.Length; i++)
+        {
+            if (state.Order[i] == $"{i}")
+            {
+                correctPieces++;
+            }
+        }
+        return correctPieces;
+    }
+
+    private State TryGenerateNeighbor(State parentState, int offset, int colCheck)
+    {
+        int i = parentState.EmptyIndex - offset;
+        int targetIndex = parentState.EmptyIndex;
+
+        if (i >= 0 && i < parentState.Order.Length &&
+            ((i % size) != colCheck) && (targetIndex == parentState.EmptyIndex))
+        {
+            State neighbor = parentState.Clone();
+
+            string temp = neighbor.Order[i];
+            neighbor.Order[i] = neighbor.Order[targetIndex];
+            neighbor.Order[targetIndex] = temp;
+
+            neighbor.EmptyIndex = i;
+            return neighbor;
+        }
+        return null;
+    }
+    private void ApplyStateToGame(State finalState)
+    {
+        Dictionary<string, Transform> nameToTransform = new Dictionary<string, Transform>();
+        foreach (Transform piece in pieces)
+        {
+            nameToTransform.Add(piece.name, piece);
+        }
+
+        for (int i = 0; i < finalState.Order.Length; i++)
+        {
+            string pieceName = finalState.Order[i];
+            Transform pieceToPlace = nameToTransform[pieceName];
+
+            pieces[i] = pieceToPlace;
+
+            float width = 1 / (float)size;
+            float x = -1 + (2 * width * (i % size)) + width;
+            float y = +1 - (2 * width * (i / size)) - width;
+            pieceToPlace.localPosition = new Vector3(x, y, 0);
+        }
+
+        emptyLocation = finalState.EmptyIndex;
+    }
+
+    #endregion
 }
