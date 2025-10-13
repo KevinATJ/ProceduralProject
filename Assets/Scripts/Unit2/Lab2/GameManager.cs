@@ -17,6 +17,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int hillClimbingIterations = 100;
     [SerializeField] private int goalBackwardIterations = 100;
 
+    [Header("Debug")]
+    [SerializeField] private float debugDelay = 0.2f;
+
     private List<Transform> pieces;
     private int emptyLocation;
     private bool shuffling = false;
@@ -106,17 +109,16 @@ public class GameManager : MonoBehaviour
     }
     private IEnumerator WaitShuffle(float duration)
     {
+        shuffling = true;
         yield return new WaitForSeconds(duration);
 
         if (generationMethod == GenerationMethod.GoalBackward)
         {
-            GenerateGoalBackward();
-            DebugPuzzleState();
+            yield return StartCoroutine(GenerateGoalBackwardStepByStep());
         }
         else if (generationMethod == GenerationMethod.HillClimbing)
         {
-            State finalState = HillClimbing_Generate();
-            DebugPuzzleState(finalState);
+            yield return StartCoroutine(HillClimbing_GenerateStepByStep());
         }
 
         shuffling = false;
@@ -243,6 +245,33 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private IEnumerator GenerateGoalBackwardStepByStep()
+    {
+        int count = 0;
+        int last = 0;
+        while (count < goalBackwardIterations)
+        {
+            
+            int rnd = Random.Range(0, size * size);
+            if (rnd == last) { continue; }
+            last = emptyLocation;
+            bool moved = false;
+            if (SwapIfValid(rnd, -size, size)) { moved = true; }
+            else if (SwapIfValid(rnd, +size, size)) { moved = true; }
+            else if (SwapIfValid(rnd, -1, 0)) { moved = true; }
+            else if (SwapIfValid(rnd, +1, size - 1)) { moved = true; }
+
+            if (moved)
+            {
+                count++;
+                
+                yield return new WaitForSeconds(debugDelay);
+            }
+        }
+        DebugPuzzleState();
+        shuffling = false;
+    }
+
     #endregion
 
     #region HILL CLIMBING
@@ -286,6 +315,54 @@ public class GameManager : MonoBehaviour
 
         Debug.Log($"Puzzle generado con dificultad (distancia Manhattan total): {bestFitness}");
         return bestState;
+    }
+
+    private IEnumerator HillClimbing_GenerateStepByStep()
+    {
+        State currentState = new State(pieces, emptyLocation);
+        int currentFitness = CalculateFitness(currentState);
+
+        State bestState = currentState.Clone();
+        int bestFitness = currentFitness;
+
+        List<State> currentPath = new List<State> { currentState.Clone() };
+        List<State> bestPath = new List<State> { currentState.Clone() };
+
+        int[] offsets = { -size, +size, -1, +1 };
+        int[] colChecks = { size, size, 0, size - 1 };
+
+        for (int i = 0; i < hillClimbingIterations; i++)
+        {
+            int offsetIndex = Random.Range(0, offsets.Length);
+            State neighbor = TryGenerateNeighbor(currentState, offsets[offsetIndex], colChecks[offsetIndex]);
+
+            if (neighbor != null)
+            {
+                int neighborFitness = CalculateFitness(neighbor);
+
+                
+
+                if (neighborFitness > bestFitness)
+                {
+                    bestFitness = neighborFitness;
+                    bestState = neighbor.Clone();
+                    bestPath = new List<State>(currentPath);
+                }
+                
+                currentState = neighbor;
+                currentPath.Add(currentState.Clone());
+            }
+        }
+
+        foreach (var state in bestPath)
+        {
+            ApplyStateToGame(state);
+            yield return new WaitForSeconds(debugDelay);
+        }
+
+        Debug.Log($"Puzzle generado con dificultad (distancia Manhattan total): {bestFitness}");
+        DebugPuzzleState(bestState);
+        shuffling = false;
     }
 
     private int CalculateFitness(State state)
