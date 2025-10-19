@@ -89,6 +89,12 @@ public class PuzzleController : MonoBehaviour
         pieces = new List<Transform>();
         CreateGamePieces(0.01f);
 
+        CurrentGoalBackwardIteration = 0;
+        CurrentHillClimbingIteration = 0;
+        CurrentHillClimbingBestFitness = 0;
+        CurrentGeneration = 0;
+        CurrentGABestFitness = 0;
+
         StartCoroutine(StartGeneration());
     }
 
@@ -277,12 +283,15 @@ public class PuzzleController : MonoBehaviour
 
     #region GOAL BACKWARD
 
+    public int CurrentGoalBackwardIteration { get; private set; } = 0;
+
     private IEnumerator GenerateGoalBackwardStepByStep()
     {
         if (rng == null) rng = new System.Random();
 
         float startTime = Time.realtimeSinceStartup;
         int count = 0;
+        CurrentGoalBackwardIteration = 0;
         int last = 0;
         while (count < goalBackwardIterations)
         {
@@ -299,10 +308,13 @@ public class PuzzleController : MonoBehaviour
             if (moved)
             {
                 count++;
+                CurrentGoalBackwardIteration = count;
 
                 yield return new WaitForSeconds(debugDelay);
             }
         }
+
+        CurrentGoalBackwardIteration = goalBackwardIterations;
 
         float endTime = Time.realtimeSinceStartup;
         float timeSeconds = endTime - startTime;
@@ -325,6 +337,9 @@ public class PuzzleController : MonoBehaviour
 
     #region HILL CLIMBING
 
+    public int CurrentHillClimbingIteration { get; private set; } = 0;
+    public int CurrentHillClimbingBestFitness { get; private set; } = 0;
+
     private IEnumerator HillClimbing_GenerateStepByStep()
     {
         if (rng == null) rng = new System.Random();
@@ -336,6 +351,9 @@ public class PuzzleController : MonoBehaviour
         State bestState = currentState.Clone();
         int bestFitness = currentFitness;
 
+        CurrentHillClimbingIteration = 0;
+        CurrentHillClimbingBestFitness = bestFitness;
+
         List<State> currentPath = new List<State> { currentState.Clone() };
         List<State> bestPath = new List<State> { currentState.Clone() };
 
@@ -344,6 +362,8 @@ public class PuzzleController : MonoBehaviour
 
         for (int i = 0; i < hillClimbingIterations; i++)
         {
+            //CurrentHillClimbingIteration = i + 1;
+
             int offsetIndex = rng.Next(offsets.Length);
             State neighbor = TryGenerateNeighbor(currentState, offsets[offsetIndex], colChecks[offsetIndex]);
 
@@ -358,12 +378,16 @@ public class PuzzleController : MonoBehaviour
                     bestFitness = neighborFitness;
                     bestState = neighbor.Clone();
                     bestPath = new List<State>(currentPath);
+                    CurrentHillClimbingBestFitness = bestFitness;
                 }
 
                 currentState = neighbor;
                 currentPath.Add(currentState.Clone());
             }
         }
+
+        //CurrentHillClimbingIteration = hillClimbingIterations;
+        CurrentHillClimbingBestFitness = bestFitness;
 
         float generationEndTime = Time.realtimeSinceStartup;
         float generationTimeSeconds = generationEndTime - startTime;
@@ -372,13 +396,18 @@ public class PuzzleController : MonoBehaviour
             TimeSeconds = generationTimeSeconds,
             FinalFitness = bestFitness
         };
-
         foreach (var state in bestPath)
         {
+            CurrentHillClimbingIteration++;
             ApplyStateToGame(state);
             yield return new WaitForSeconds(debugDelay);
         }
-
+        while ((hillClimbingIterations-CurrentHillClimbingIteration)>0)
+        {
+            CurrentHillClimbingIteration++;
+            yield return new WaitForSeconds(debugDelay);
+        }
+        
         Debug.Log($"Puzzle HillClimbing generado con dificultad (Manhattan): {result.FinalFitness} en {result.TimeSeconds:F4}s. Total Iteraciones: {hillClimbingIterations}");
         DebugPuzzleState(bestState);
         shuffling = false;
@@ -455,6 +484,10 @@ public class PuzzleController : MonoBehaviour
     #endregion
 
     #region GENETIC ALGORITHM
+
+    public int CurrentGeneration { get; private set; } = 0;
+    public int CurrentGABestFitness { get; private set; } = 0;
+
     private IEnumerator GeneticAlgorithm()
     {
         if (rng == null) rng = new System.Random();
@@ -465,8 +498,13 @@ public class PuzzleController : MonoBehaviour
         State bestState = FindBestState(population);
         int bestFitness = CalculateFitness(bestState);
 
+        CurrentGeneration = 0;
+        CurrentGABestFitness = bestFitness;
+
         for (int gen = 0; gen < maxGenerations; gen++)
         {
+            CurrentGeneration = gen + 1;
+
             List<State> newPopulation = new List<State>();
 
             while (newPopulation.Count < populationSize)
@@ -506,11 +544,16 @@ public class PuzzleController : MonoBehaviour
                 bestState = currentGenBest;
             }
 
+            CurrentGABestFitness = bestFitness;
+
             Debug.Log($"Gen {gen}: Mejor Fitness = {bestFitness}");
 
             ApplyStateToGame(bestState);
             yield return new WaitForSeconds(debugDelay);
         }
+
+        if (maxGenerations > 0) CurrentGeneration = maxGenerations;
+        CurrentGABestFitness = bestFitness;
 
         float endTime = Time.realtimeSinceStartup;
         float timeSeconds = endTime - startTime;

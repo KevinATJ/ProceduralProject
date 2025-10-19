@@ -6,6 +6,7 @@ public class PauseMenuController : MonoBehaviour
 {
     [Header("Referencias")]
     [SerializeField] private GameObject pauseMenuPanel;
+    [SerializeField] private GameObject detailsPanel;
     [SerializeField] private GameManager gameManager;
 
     [Header("UI Elements")]
@@ -37,7 +38,11 @@ public class PauseMenuController : MonoBehaviour
 
     private void Start()
     {
-        if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
+        if (pauseMenuPanel != null)
+        {
+            pauseMenuPanel.SetActive(false);
+            detailsPanel.SetActive(true);
+        }
         SetupUI();
     }
 
@@ -114,6 +119,7 @@ public class PauseMenuController : MonoBehaviour
 
         bool opening = !pauseMenuPanel.activeSelf;
         pauseMenuPanel.SetActive(opening);
+        detailsPanel.SetActive(!opening);
         Time.timeScale = opening ? 0 : 1;
         Cursor.visible = opening;
         Cursor.lockState = opening ? CursorLockMode.None : CursorLockMode.Locked;
