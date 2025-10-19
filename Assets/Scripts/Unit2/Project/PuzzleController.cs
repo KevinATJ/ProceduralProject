@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -21,9 +22,15 @@ public class PuzzleController : MonoBehaviour
     [SerializeField][Range(0f, 1f)] private float mutationRate = 0.05f;
     [SerializeField] private int maxGenerations = 20;
 
+    [Header("Seed (opcional)")]
+    [SerializeField] private bool useSeed = false;
+    [SerializeField] private int seed = 0;
+
+    private System.Random rng;
+
     private Transform gameTransform;
     private int size = 4;
-    private GenerationMethod generationMethod;
+    private GenerationMethod generationMethod;  
     private class GenerationResult
     {
         public float TimeSeconds { get; set; }
@@ -65,6 +72,19 @@ public class PuzzleController : MonoBehaviour
         size = newSize;
         generationMethod = method;
         gameTransform = spawnPoint;
+
+        if (useSeed)
+        {
+            rng = new System.Random(seed);
+        }
+        else
+        {
+            int generatedSeed = Environment.TickCount ^ this.GetInstanceID();
+            seed = generatedSeed;
+            rng = new System.Random(seed);
+        }
+
+        Debug.Log($"[{name}] Initialize method={generationMethod} UseSeed={useSeed} Seed={seed}");
 
         pieces = new List<Transform>();
         CreateGamePieces(0.01f);
@@ -257,32 +277,17 @@ public class PuzzleController : MonoBehaviour
 
     #region GOAL BACKWARD
 
-    /*private void GenerateGoalBackward()
-    {
-        int count = 0;
-        int last = 0;
-        while (count < (goalBackwardIterations))
-        {
-            int rnd = Random.Range(0, size * size);
-            if (rnd == last) { continue; }
-            last = emptyLocation;
-
-            if (SwapIfValid(rnd, -size, size)) { count++; }
-            else if (SwapIfValid(rnd, +size, size)) { count++; }
-            else if (SwapIfValid(rnd, -1, 0)) { count++; }
-            else if (SwapIfValid(rnd, +1, size - 1)) { count++; }
-        }
-    }*/
-
     private IEnumerator GenerateGoalBackwardStepByStep()
     {
+        if (rng == null) rng = new System.Random();
+
         float startTime = Time.realtimeSinceStartup;
         int count = 0;
         int last = 0;
         while (count < goalBackwardIterations)
         {
 
-            int rnd = Random.Range(0, size * size);
+            int rnd = rng.Next(0, size * size);
             if (rnd == last) { continue; }
             last = emptyLocation;
             bool moved = false;
@@ -320,59 +325,10 @@ public class PuzzleController : MonoBehaviour
 
     #region HILL CLIMBING
 
-    /*private State HillClimbing_Generate()
-    {
-        float startTime = Time.realtimeSinceStartup;
-
-        State currentState = new State(pieces, emptyLocation);
-        int currentFitness = CalculateFitness(currentState);
-
-        State bestState = currentState;
-        int bestFitness = currentFitness;
-
-        int[] offsets = { -size, +size, -1, +1 };
-        int[] colChecks = { size, size, 0, size - 1 };
-
-        for (int i = 0; i < hillClimbingIterations; i++)
-        {
-
-            int offsetIndex = Random.Range(0, offsets.Length);
-            State neighbor = TryGenerateNeighbor(currentState, offsets[offsetIndex], colChecks[offsetIndex]);
-
-            if (neighbor != null)
-            {
-                int neighborFitness = CalculateFitness(neighbor);
-
-
-                if (neighborFitness > bestFitness)
-                {
-                    bestFitness = neighborFitness;
-                    bestState = neighbor;
-                }
-
-
-                currentState = neighbor;
-            }
-        }
-
-
-        ApplyStateToGame(bestState);
-
-        float endTime = Time.realtimeSinceStartup;
-        float timeSeconds = endTime - startTime;
-
-        GenerationResult result = new GenerationResult
-        {
-            TimeSeconds = timeSeconds,
-            FinalFitness = bestFitness
-        };
-
-        Debug.Log($"Puzzle HillClimbing generado con dificultad (Manhattan): {result.FinalFitness} en {result.TimeSeconds:F4}s. Total Iteraciones: {hillClimbingIterations}");
-        return bestState;
-    }*/
-
     private IEnumerator HillClimbing_GenerateStepByStep()
     {
+        if (rng == null) rng = new System.Random();
+
         float startTime = Time.realtimeSinceStartup;
         State currentState = new State(pieces, emptyLocation);
         int currentFitness = CalculateFitness(currentState);
@@ -388,7 +344,7 @@ public class PuzzleController : MonoBehaviour
 
         for (int i = 0; i < hillClimbingIterations; i++)
         {
-            int offsetIndex = Random.Range(0, offsets.Length);
+            int offsetIndex = rng.Next(offsets.Length);
             State neighbor = TryGenerateNeighbor(currentState, offsets[offsetIndex], colChecks[offsetIndex]);
 
             if (neighbor != null)
@@ -501,6 +457,8 @@ public class PuzzleController : MonoBehaviour
     #region GENETIC ALGORITHM
     private IEnumerator GeneticAlgorithm()
     {
+        if (rng == null) rng = new System.Random();
+
         float startTime = Time.realtimeSinceStartup;
         List<State> population = InitializePopulation();
 
@@ -519,7 +477,7 @@ public class PuzzleController : MonoBehaviour
                 State child1 = parent1.Clone();
                 State child2 = parent2.Clone();
 
-                if (Random.value < crossoverRate)
+                if (rng.NextDouble() < crossoverRate)
                 {
                     (child1, child2) = OrderCrossover(parent1, parent2);
                 }
@@ -592,7 +550,7 @@ public class PuzzleController : MonoBehaviour
 
         for (int i = 0; i < size; i++)
         {
-            int randomIndex = Random.Range(0, population.Count);
+            int randomIndex = rng.Next(population.Count);
             State candidate = population[randomIndex];
             int fitness = CalculateFitness(candidate);
 
@@ -613,8 +571,8 @@ public class PuzzleController : MonoBehaviour
         child1.Order = new string[N];
         child2.Order = new string[N];
 
-        int start = Random.Range(0, N);
-        int end = Random.Range(0, N);
+        int start = rng.Next(N);
+        int end = rng.Next(N);
 
         if (start > end) (start, end) = (end, start);
 
@@ -665,11 +623,11 @@ public class PuzzleController : MonoBehaviour
 
     private void Mutate(State state)
     {
-        if (Random.value < mutationRate)
+        if (rng.NextDouble() < mutationRate)
         {
             int N = state.Order.Length;
-            int index1 = Random.Range(0, N);
-            int index2 = Random.Range(0, N);
+            int index1 = rng.Next(N);
+            int index2 = rng.Next(N);
 
             string temp = state.Order[index1];
             state.Order[index1] = state.Order[index2];
@@ -696,11 +654,10 @@ public class PuzzleController : MonoBehaviour
         while (count < iterations)
         {
             int empty = state.EmptyIndex;
-            int neighborIndex = -1;
             int offsetToUse = 0;
             int colCheckToUse = 0;
 
-            int rndDirection = Random.Range(0, offsets.Length);
+            int rndDirection = rng.Next(offsets.Length);
 
             offsetToUse = offsets[rndDirection];
             colCheckToUse = colChecks[rndDirection];
@@ -818,4 +775,16 @@ public class PuzzleController : MonoBehaviour
     }
 
     #endregion
+
+    public int Size { get => size; set => size = value; }
+    public GenerationMethod GenerationMethod { get => generationMethod; set => generationMethod = value; }
+    public int GoalBackwardIterations { get => goalBackwardIterations; set => goalBackwardIterations = value; }
+    public int HillClimbingIterations { get => hillClimbingIterations; set => hillClimbingIterations = value; }
+    public int PopulationSize { get => populationSize; set => populationSize = value; }
+    public float CrossoverRate { get => crossoverRate; set => crossoverRate = value; }
+    public float MutationRate { get => mutationRate; set => mutationRate = value; }
+    public int MaxGenerations { get => maxGenerations; set => maxGenerations = value; }
+    public float DebugDelay { get => debugDelay; set => debugDelay = value; }
+    public bool UseSeed { get => useSeed; set => useSeed = value; }
+    public int Seed { get => seed; set => seed = value; }
 }
