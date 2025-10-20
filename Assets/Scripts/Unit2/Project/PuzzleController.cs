@@ -31,7 +31,7 @@ public class PuzzleController : MonoBehaviour
     private Transform gameTransform;
     private int size = 4;
     private GenerationMethod generationMethod;  
-    private class GenerationResult
+    public class GenerationResult
     {
         public float TimeSeconds { get; set; }
         public int FinalFitness { get; set; }
@@ -327,6 +327,7 @@ public class PuzzleController : MonoBehaviour
             TimeSeconds = timeSeconds,
             FinalFitness = finalFitness
         };
+        GBResult = result;
 
         Debug.Log($"Puzzle GoalBackward generado en {result.TimeSeconds:F4}s. Total Movimientos: {goalBackwardIterations}. Dificultad Final (Manhattan): {result.FinalFitness}");
         DebugPuzzleState();
@@ -396,6 +397,7 @@ public class PuzzleController : MonoBehaviour
             TimeSeconds = generationTimeSeconds,
             FinalFitness = bestFitness
         };
+        HCResult = result;
         foreach (var state in bestPath)
         {
             CurrentHillClimbingIteration++;
@@ -563,7 +565,7 @@ public class PuzzleController : MonoBehaviour
             TimeSeconds = timeSeconds,
             FinalFitness = bestFitness
         };
-
+        GAResult = result;
         ApplyStateToGame(bestState);
         Debug.Log($"Puzzle AG generado con dificultad (Manhattan): {result.FinalFitness} en {result.TimeSeconds:F4}s. Total Generaciones: {maxGenerations}");
         DebugPuzzleState(bestState);
@@ -830,4 +832,7 @@ public class PuzzleController : MonoBehaviour
     public float DebugDelay { get => debugDelay; set => debugDelay = value; }
     public bool UseSeed { get => useSeed; set => useSeed = value; }
     public int Seed { get => seed; set => seed = value; }
+    public GenerationResult GBResult { get; private set; }
+    public GenerationResult HCResult { get; private set; }
+    public GenerationResult GAResult { get; private set; }
 }
