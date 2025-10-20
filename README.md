@@ -63,7 +63,7 @@ El objetivo de este es permitir crear puzzles resolubles de distinta dificultad 
 ---
 
 ## 3) Instrucciones de uso en Unity
-1. Clona el repositorio:  [Repositorio] (https://github.com/KevinATJ/ProceduralProject)
+1. Clona el repositorio:  [Repositorio] (https://github.com/KevinATJ/ProceduralProject/tree/Unit2)
 2. Descarga o ejecuta el proyecto en Unity 2022.3.30f1
 3. Dirigete a la escena Sl_Puzzle
 4. Revisa las variables del PuzzleControler y cambialas si las deseas.
