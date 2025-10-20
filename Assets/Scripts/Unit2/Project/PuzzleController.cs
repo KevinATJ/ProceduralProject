@@ -289,16 +289,21 @@ public class PuzzleController : MonoBehaviour
     {
         if (rng == null) rng = new System.Random();
 
+        List<State> shuffledPath = new List<State>();
+
         float startTime = Time.realtimeSinceStartup;
+
         int count = 0;
         CurrentGoalBackwardIteration = 0;
         int last = 0;
+
         while (count < goalBackwardIterations)
         {
-
             int rnd = rng.Next(0, size * size);
             if (rnd == last) { continue; }
+
             last = emptyLocation;
+
             bool moved = false;
             if (SwapIfValid(rnd, -size, size)) { moved = true; }
             else if (SwapIfValid(rnd, +size, size)) { moved = true; }
@@ -308,13 +313,9 @@ public class PuzzleController : MonoBehaviour
             if (moved)
             {
                 count++;
-                CurrentGoalBackwardIteration = count;
-
-                yield return new WaitForSeconds(debugDelay);
+                shuffledPath.Add(new State(pieces, emptyLocation));
             }
         }
-
-        CurrentGoalBackwardIteration = goalBackwardIterations;
 
         float endTime = Time.realtimeSinceStartup;
         float timeSeconds = endTime - startTime;
@@ -328,6 +329,19 @@ public class PuzzleController : MonoBehaviour
             FinalFitness = finalFitness
         };
         GBResult = result;
+
+        int displayMove = 0;
+        foreach (var state in shuffledPath)
+        {
+            displayMove++;
+            CurrentGoalBackwardIteration = displayMove;
+
+            ApplyStateToGame(state);
+            yield return new WaitForSeconds(debugDelay);
+        }
+
+        CurrentGoalBackwardIteration = goalBackwardIterations;
+        ApplyStateToGame(finalCurrentState);
 
         Debug.Log($"Puzzle GoalBackward generado en {result.TimeSeconds:F4}s. Total Movimientos: {goalBackwardIterations}. Dificultad Final (Manhattan): {result.FinalFitness}");
         DebugPuzzleState();
@@ -355,7 +369,6 @@ public class PuzzleController : MonoBehaviour
         CurrentHillClimbingIteration = 0;
         CurrentHillClimbingBestFitness = bestFitness;
 
-        List<State> currentPath = new List<State> { currentState.Clone() };
         List<State> bestPath = new List<State> { currentState.Clone() };
 
         int[] offsets = { -size, +size, -1, +1 };
@@ -363,8 +376,6 @@ public class PuzzleController : MonoBehaviour
 
         for (int i = 0; i < hillClimbingIterations; i++)
         {
-            //CurrentHillClimbingIteration = i + 1;
-
             int offsetIndex = rng.Next(offsets.Length);
             State neighbor = TryGenerateNeighbor(currentState, offsets[offsetIndex], colChecks[offsetIndex]);
 
@@ -372,45 +383,50 @@ public class PuzzleController : MonoBehaviour
             {
                 int neighborFitness = CalculateFitness(neighbor);
 
-
-
-                if (neighborFitness > bestFitness)
+                if (neighborFitness > currentFitness)
                 {
-                    bestFitness = neighborFitness;
-                    bestState = neighbor.Clone();
-                    bestPath = new List<State>(currentPath);
-                    CurrentHillClimbingBestFitness = bestFitness;
+                    currentFitness = neighborFitness;
+                    currentState = neighbor;
                 }
 
-                currentState = neighbor;
-                currentPath.Add(currentState.Clone());
+                if (currentFitness > bestFitness)
+                {
+                    bestFitness = currentFitness;
+                    bestState = currentState.Clone();
+                    CurrentHillClimbingBestFitness = bestFitness;
+                    bestPath.Add(bestState.Clone());
+                }
             }
         }
 
-        //CurrentHillClimbingIteration = hillClimbingIterations;
-        CurrentHillClimbingBestFitness = bestFitness;
-
         float generationEndTime = Time.realtimeSinceStartup;
         float generationTimeSeconds = generationEndTime - startTime;
+
         GenerationResult result = new GenerationResult
         {
             TimeSeconds = generationTimeSeconds,
             FinalFitness = bestFitness
         };
         HCResult = result;
+
+        int displayIteration = 0;
         foreach (var state in bestPath)
         {
-            CurrentHillClimbingIteration++;
+            displayIteration++;
+            CurrentHillClimbingIteration = displayIteration;
+
             ApplyStateToGame(state);
             yield return new WaitForSeconds(debugDelay);
         }
-        while ((hillClimbingIterations-CurrentHillClimbingIteration)>0)
+
+        while (displayIteration < hillClimbingIterations)
         {
-            CurrentHillClimbingIteration++;
+            displayIteration++;
+            CurrentHillClimbingIteration = displayIteration;
             yield return new WaitForSeconds(debugDelay);
         }
-        
-        Debug.Log($"Puzzle HillClimbing generado con dificultad (Manhattan): {result.FinalFitness} en {result.TimeSeconds:F4}s. Total Iteraciones: {hillClimbingIterations}");
+
+        Debug.Log($"Puzzle HillClimbing generado con dificultad (Manhattan): {result.FinalFitness}. Total Iteraciones: {hillClimbingIterations}");
         DebugPuzzleState(bestState);
         shuffling = false;
     }
@@ -489,26 +505,31 @@ public class PuzzleController : MonoBehaviour
 
     public int CurrentGeneration { get; private set; } = 0;
     public int CurrentGABestFitness { get; private set; } = 0;
+    public float CurrentGAElapsedTime { get; private set; } = 0f;
 
     private IEnumerator GeneticAlgorithm()
     {
         if (rng == null) rng = new System.Random();
 
         float startTime = Time.realtimeSinceStartup;
+
         List<State> population = InitializePopulation();
 
         State bestState = FindBestState(population);
         int bestFitness = CalculateFitness(bestState);
 
-        CurrentGeneration = 0;
         CurrentGABestFitness = bestFitness;
+        CurrentGAElapsedTime = 0f;
+        CurrentGeneration = 0;
+
+        List<int> bestFitnessPerGeneration = new List<int>();
+        List<State> bestStatePerGeneration = new List<State>();
 
         for (int gen = 0; gen < maxGenerations; gen++)
         {
             CurrentGeneration = gen + 1;
 
             List<State> newPopulation = new List<State>();
-
             while (newPopulation.Count < populationSize)
             {
                 State parent1 = Selection(population, 3);
@@ -543,34 +564,45 @@ public class PuzzleController : MonoBehaviour
             if (currentGenBestFitness > bestFitness)
             {
                 bestFitness = currentGenBestFitness;
-                bestState = currentGenBest;
+                bestState = currentGenBest.Clone();
             }
 
-            CurrentGABestFitness = bestFitness;
+            bestFitnessPerGeneration.Add(bestFitness);
+            bestStatePerGeneration.Add(bestState.Clone());
+        }
 
-            Debug.Log($"Gen {gen}: Mejor Fitness = {bestFitness}");
+        float logicalTime = Time.realtimeSinceStartup - startTime;
+        GAResult = new GenerationResult
+        {
+            TimeSeconds = logicalTime,
+            FinalFitness = bestFitness
+        };
+
+        Debug.Log($"[GA] Resultado final inmediato: Mejor Fitness = {bestFitness}, Tiempo = {logicalTime:F4}s");
+
+        for (int gen = 0; gen < maxGenerations; gen++)
+        {
+            CurrentGeneration = gen + 1;
+
+            bestState = bestStatePerGeneration[gen];
+            CurrentGABestFitness = bestFitnessPerGeneration[gen];
+            CurrentGAElapsedTime = logicalTime;
 
             ApplyStateToGame(bestState);
+
+            Debug.Log($"Generación {CurrentGeneration}/{maxGenerations}: Mejor Fitness actual = {CurrentGABestFitness} (Tiempo lógico: {logicalTime:F4}s)");
+
             yield return new WaitForSeconds(debugDelay);
         }
 
-        if (maxGenerations > 0) CurrentGeneration = maxGenerations;
-        CurrentGABestFitness = bestFitness;
-
-        float endTime = Time.realtimeSinceStartup;
-        float timeSeconds = endTime - startTime;
-
-        GenerationResult result = new GenerationResult
-        {
-            TimeSeconds = timeSeconds,
-            FinalFitness = bestFitness
-        };
-        GAResult = result;
         ApplyStateToGame(bestState);
-        Debug.Log($"Puzzle AG generado con dificultad (Manhattan): {result.FinalFitness} en {result.TimeSeconds:F4}s. Total Generaciones: {maxGenerations}");
+
+        Debug.Log($"Puzzle AG generado con dificultad (Manhattan): {GAResult.FinalFitness}. Tiempo total: {GAResult.TimeSeconds:F4}s. Total Generaciones: {maxGenerations}");
         DebugPuzzleState(bestState);
         shuffling = false;
     }
+
+
     private List<State> InitializePopulation()
     {
         List<State> population = new List<State>();
