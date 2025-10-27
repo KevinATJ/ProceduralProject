@@ -32,7 +32,7 @@ public class WFCGenerator : MonoBehaviour
 
             if (cellToCollapse == null)
             {
-                Debug.Log("Todas las celdas colapsadas. Proceso finalizado.");
+                Debug.Log("Todas las celdas colapsadas");
                 break;
             }
 
@@ -62,7 +62,7 @@ public class WFCGenerator : MonoBehaviour
             yield return new WaitForSeconds(StepDelay);
         }
 
-        Debug.Log("Generación de mapa finalizada. Las piezas se han instanciado");
+        Debug.Log("Mapa creado");
     }
 
     private void CleanupPreviousMap()
@@ -166,7 +166,7 @@ public class WFCGenerator : MonoBehaviour
             Instantiate(chosenTile.Prefab, position, prefabRotation, MapContainer.transform);
         }
 
-        Debug.Log($"---> Celda colapsada: ({cell.Row}, {cell.Col}) | ID Elegido: {chosenID}");
+        Debug.Log($"Celda colapsada: ({cell.Row}, {cell.Col}) | ID Elegido: {chosenID}");
     }
 
     private void Propagate(Cell startCell)
@@ -182,7 +182,7 @@ public class WFCGenerator : MonoBehaviour
 
             (int dr, int dc, string direction)[] neighbors =
             {
-                (-1, 0, "UP"), (1, 0, "DOWN"), (0, -1, "LEFT"), (0, 1, "RIGHT")
+                (1, 0, "UP"), (-1, 0, "DOWN"), (0, -1, "LEFT"), (0, 1, "RIGHT")
             };
 
             foreach (var (dr, dc, direction) in neighbors)
@@ -225,8 +225,8 @@ public class WFCGenerator : MonoBehaviour
 
                 switch (relation)
                 {
-                    case "UP": requiredCompatibility = sourceTile.DownCompatibility; break;
-                    case "DOWN": requiredCompatibility = sourceTile.UpCompatibility; break;
+                    case "UP": requiredCompatibility = sourceTile.UpCompatibility; break;
+                    case "DOWN": requiredCompatibility = sourceTile.DownCompatibility; break;
                     case "LEFT": requiredCompatibility = sourceTile.LeftCompatibility; break;
                     case "RIGHT": requiredCompatibility = sourceTile.RightCompatibility; break;
                 }
