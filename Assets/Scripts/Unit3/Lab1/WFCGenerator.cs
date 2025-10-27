@@ -157,7 +157,7 @@ public class WFCGenerator : MonoBehaviour
 
             Vector3 position = new Vector3(
                 cell.Col * size - offset * size,
-                cell.Row * size - offset * size,
+                 offset * size - cell.Row * size ,
                 0
             );
 
@@ -182,7 +182,7 @@ public class WFCGenerator : MonoBehaviour
 
             (int dr, int dc, string direction)[] neighbors =
             {
-                (1, 0, "UP"), (-1, 0, "DOWN"), (0, -1, "LEFT"), (0, 1, "RIGHT")
+                (-1, 0, "UP"), (1, 0, "DOWN"), (0, -1, "LEFT"), (0, 1, "RIGHT")
             };
 
             foreach (var (dr, dc, direction) in neighbors)
