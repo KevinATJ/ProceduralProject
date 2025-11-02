@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
-
 public class Cell
 {
     public List<int> PossibleTileIDs;
@@ -21,7 +20,11 @@ public class Cell
         {
             PossibleTileIDs = new List<int>(allTileIDs);
         }
-    } 
+        else
+        {
+            PossibleTileIDs = new List<int>();
+        }
+    }
     public bool RemoveOption(int tileID)
     {
         return PossibleTileIDs.Remove(tileID);
