@@ -231,7 +231,6 @@ public class WFCGenerator : MonoBehaviour
         HistoryStack.Clear();
         MapContainer = new GameObject("GeneratedMapContainer");
 
-        // Usa AllTileIDs ya populado por ProbabilisticWFC si es Complex, sino usa AllTiles.
         if (CurrentRunMode == GenerationMode.SimpleTiled || AllTileIDs == null || AllTileIDs.Count == 0)
             AllTileIDs = AllTiles.Select(t => t.ID).ToList();
 
