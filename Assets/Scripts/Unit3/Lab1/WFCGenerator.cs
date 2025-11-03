@@ -15,7 +15,7 @@ public class WFCGenerator : MonoBehaviour
     [Header("Configuración")]
     public Tile[] AllTiles;
     public int SimpleTiledContextGridSize = 10;
-    public int FinalOverlappingGridSize = 20;
+    public int FinalOverlappingGridSize = 10;
     public float StepDelay = 0.05f;
     public float TileSize = 1f;
 
@@ -23,10 +23,10 @@ public class WFCGenerator : MonoBehaviour
     private List<int> AllTileIDs;
     private Stack<Cell[,]> HistoryStack = new Stack<Cell[,]>();
     private GameObject MapContainer;
-    private List<PatternData> AllPatterns = new List<PatternData>();
     private int[,] GeneratedContextMatrix;
     private int GridSize;
     private GenerationMode CurrentRunMode;
+    private Dictionary<int, Dictionary<string, Dictionary<int, float>>> adjacencyProbs;
 
     void Start()
     {
@@ -35,30 +35,12 @@ public class WFCGenerator : MonoBehaviour
         if (Mode == GenerationMode.SimpleTiled)
             StartCoroutine(SimpleTiledWFC(SimpleTiledContextGridSize, true));
         else if (Mode == GenerationMode.ComplexWFC)
-            StartCoroutine(StartComplexWFC());
-    }
-
-    public IEnumerator StartComplexWFC()
-    {
-        int[,] sourceMatrix = null;
-        if (UseCustomMatrix)
-        {
-            if (ManualMatrix != null && ManualMatrix.rows != null && ManualMatrix.rows.Count > 0)
-                sourceMatrix = ManualMatrix.ToArray();
-            else yield break;
-        }
-        else
-        {
-            yield return StartCoroutine(SimpleTiledWFC(SimpleTiledContextGridSize, false));
-            sourceMatrix = GeneratedContextMatrix;
-        }
-        if (sourceMatrix == null) yield break;
-        yield return StartCoroutine(OverlappingWFC(FinalOverlappingGridSize, true, sourceMatrix));
+            StartCoroutine(ProbabilisticWFC());
     }
 
     public IEnumerator SimpleTiledWFC(int targetGridSize, bool isFinalRender)
     {
-        InitializeGrid(GenerationMode.SimpleTiled, targetGridSize, null);
+        InitializeGrid(targetGridSize);
         if (AllTileIDs == null || AllTileIDs.Count == 0) yield break;
         int safetyCounter = 0;
         int safetyLimit = targetGridSize * targetGridSize * 50;
@@ -77,13 +59,13 @@ public class WFCGenerator : MonoBehaviour
                 else
                 {
                     if (CheckIfDone()) break;
-                    InitializeGrid(GenerationMode.SimpleTiled, targetGridSize, null);
+                    InitializeGrid(targetGridSize);
                     yield return null;
                     continue;
                 }
             }
             SaveState();
-            CollapseCell(cellToCollapse, isFinalRender);
+            CollapseCellSimple(cellToCollapse, isFinalRender);
             Propagate(cellToCollapse);
             if (isFinalRender) yield return new WaitForSeconds(StepDelay);
         }
@@ -99,68 +81,171 @@ public class WFCGenerator : MonoBehaviour
         yield return null;
     }
 
-    public IEnumerator OverlappingWFC(int targetGridSize, bool isFinalRender, int[,] sourceMatrix)
+    IEnumerator ProbabilisticWFC()
     {
-        InitializeGrid(GenerationMode.ComplexWFC, targetGridSize, sourceMatrix);
-        if (AllPatterns == null || AllPatterns.Count == 0) yield break;
-        int safetyCounter = 0;
-        int safetyLimit = targetGridSize * targetGridSize * 200;
-        while (!CheckIfDone() && safetyCounter < safetyLimit)
+        int[,] sourceMatrix = null;
+        if (UseCustomMatrix && ManualMatrix != null && ManualMatrix.rows.Count > 0)
+            sourceMatrix = ManualMatrix.ToArray();
+        else
         {
-            safetyCounter++;
-            Cell cellToCollapse = FindCellWithMinEntropy();
-            if (cellToCollapse == null || cellToCollapse.IsContradiction)
-            {
-                if (HistoryStack.Count > 0)
-                {
-                    Grid = HistoryStack.Pop();
-                    yield return null;
-                    continue;
-                }
-                else
-                {
-                    if (CheckIfDone()) break;
-                    InitializeGrid(GenerationMode.ComplexWFC, targetGridSize, sourceMatrix);
-                    yield return null;
-                    continue;
-                }
-            }
-            SaveState();
-            CollapseCell(cellToCollapse, isFinalRender);
-            Propagate(cellToCollapse);
-            if (isFinalRender) yield return new WaitForSeconds(StepDelay);
+            yield return StartCoroutine(SimpleTiledWFC(SimpleTiledContextGridSize, false));
+            sourceMatrix = GeneratedContextMatrix;
         }
+        if (sourceMatrix == null) yield break;
+
+        adjacencyProbs = ComputeAdjacencyProbabilities(sourceMatrix);
+        int[,] result = GenerateMatrixByProbability(FinalOverlappingGridSize, sourceMatrix, adjacencyProbs);
+        RenderGeneratedMatrix(result);
         yield return null;
     }
 
-    private void InitializeGrid(GenerationMode initMode, int initGridSize, int[,] contextMatrix)
+    Dictionary<int, Dictionary<string, Dictionary<int, float>>> ComputeAdjacencyProbabilities(int[,] matrix)
     {
-        GridSize = initGridSize;
-        CurrentRunMode = initMode;
+        var result = new Dictionary<int, Dictionary<string, Dictionary<int, float>>>();
+        int h = matrix.GetLength(0);
+        int w = matrix.GetLength(1);
+        string[] dirs = { "UP", "DOWN", "LEFT", "RIGHT" };
+
+        foreach (string d in dirs)
+            foreach (int val in matrix)
+                if (!result.ContainsKey(val))
+                    result[val] = new Dictionary<string, Dictionary<int, float>>()
+                    {
+                        {"UP", new Dictionary<int,float>()},
+                        {"DOWN", new Dictionary<int,float>()},
+                        {"LEFT", new Dictionary<int,float>()},
+                        {"RIGHT", new Dictionary<int,float>()}
+                    };
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int v = matrix[y, x];
+                if (y > 0) AddProb(result[v]["UP"], matrix[y - 1, x]);
+                if (y < h - 1) AddProb(result[v]["DOWN"], matrix[y + 1, x]);
+                if (x > 0) AddProb(result[v]["LEFT"], matrix[y, x - 1]);
+                if (x < w - 1) AddProb(result[v]["RIGHT"], matrix[y, x + 1]);
+            }
+        }
+
+        foreach (var valPair in result)
+        {
+            foreach (var dirPair in valPair.Value)
+            {
+                float total = dirPair.Value.Values.Sum();
+                if (total > 0)
+                {
+                    var keys = dirPair.Value.Keys.ToList();
+                    foreach (var k in keys)
+                        dirPair.Value[k] /= total;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    void AddProb(Dictionary<int, float> dict, int neighbor)
+    {
+        if (!dict.ContainsKey(neighbor)) dict[neighbor] = 0;
+        dict[neighbor]++;
+    }
+
+    int[,] GenerateMatrixByProbability(int size, int[,] source, Dictionary<int, Dictionary<string, Dictionary<int, float>>> probs)
+    {
+        int[,] result = new int[size, size];
+        int[] allValues = source.Cast<int>().Distinct().ToArray();
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                if (y == 0 && x == 0)
+                {
+                    result[y, x] = allValues[Random.Range(0, allValues.Length)];
+                    continue;
+                }
+
+                Dictionary<int, float> combined = new Dictionary<int, float>();
+
+                void MergeProb(int centerVal, string dir)
+                {
+                    if (!probs.ContainsKey(centerVal)) return;
+                    foreach (var kv in probs[centerVal][dir])
+                    {
+                        if (!combined.ContainsKey(kv.Key)) combined[kv.Key] = 0;
+                        combined[kv.Key] += kv.Value;
+                    }
+                }
+
+                if (y > 0) MergeProb(result[y - 1, x], "DOWN");
+                if (x > 0) MergeProb(result[y, x - 1], "RIGHT");
+
+                if (combined.Count == 0)
+                    result[y, x] = allValues[Random.Range(0, allValues.Length)];
+                else
+                {
+                    float total = combined.Values.Sum();
+                    float rand = Random.Range(0f, total);
+                    float acc = 0;
+                    foreach (var kv in combined)
+                    {
+                        acc += kv.Value;
+                        if (rand <= acc)
+                        {
+                            result[y, x] = kv.Key;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    void RenderGeneratedMatrix(int[,] matrix)
+    {
+        CleanupPreviousMap();
+        MapContainer = new GameObject("GeneratedMapContainer");
+        int h = matrix.GetLength(0);
+        int w = matrix.GetLength(1);
+        float spacing = TileSize;
+        if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
+        float halfMapWorld = (w - 1) * spacing * 0.5f;
+        for (int r = 0; r < h; r++)
+        {
+            for (int c = 0; c < w; c++)
+            {
+                int id = matrix[r, c];
+                Tile tile = AllTiles.FirstOrDefault(t => t.ID == id);
+                if (tile == null || tile.Prefab == null) continue;
+                Vector3 pos = new Vector3(c * spacing - halfMapWorld, halfMapWorld - r * spacing, 0f);
+                Instantiate(tile.Prefab, pos, tile.Prefab.transform.rotation, MapContainer.transform);
+            }
+        }
+    }
+
+
+    void InitializeGrid(int size)
+    {
+        GridSize = size;
         CleanupPreviousMap();
         HistoryStack.Clear();
         MapContainer = new GameObject("GeneratedMapContainer");
+        AllTileIDs = AllTiles.Select(t => t.ID).ToList();
         Grid = new Cell[GridSize, GridSize];
-        if (initMode == GenerationMode.SimpleTiled)
-            AllTileIDs = AllTiles.Select(t => t.ID).ToList();
-        else
-        {
-            AllPatterns = ExtractPatternsAndRules(contextMatrix) ?? new List<PatternData>();
-            AllTileIDs = AllPatterns.Select(p => p.ID).ToList();
-            if (AllTileIDs == null || AllTileIDs.Count == 0) AllTileIDs = AllTiles.Select(t => t.ID).ToList();
-        }
         for (int r = 0; r < GridSize; r++)
             for (int c = 0; c < GridSize; c++)
                 Grid[r, c] = new Cell(r, c, AllTileIDs);
     }
 
-    private void CleanupPreviousMap()
+    void CleanupPreviousMap()
     {
-        GameObject oldMap = GameObject.Find("GeneratedMapContainer");
-        if (oldMap != null) Destroy(oldMap);
+        GameObject old = GameObject.Find("GeneratedMapContainer");
+        if (old != null) Destroy(old);
     }
 
-    private void SaveState()
+    void SaveState()
     {
         Cell[,] newState = new Cell[GridSize, GridSize];
         for (int r = 0; r < GridSize; r++)
@@ -169,10 +254,10 @@ public class WFCGenerator : MonoBehaviour
         HistoryStack.Push(newState);
     }
 
-    private Cell FindCellWithMinEntropy()
+    Cell FindCellWithMinEntropy()
     {
         int minEntropy = int.MaxValue;
-        List<Cell> minimumEntropyCells = new List<Cell>();
+        List<Cell> minCells = new List<Cell>();
         foreach (Cell cell in Grid)
         {
             if (!cell.Collapsed)
@@ -180,262 +265,84 @@ public class WFCGenerator : MonoBehaviour
                 if (cell.Entropy < minEntropy)
                 {
                     minEntropy = cell.Entropy;
-                    minimumEntropyCells.Clear();
-                    minimumEntropyCells.Add(cell);
+                    minCells.Clear();
+                    minCells.Add(cell);
                 }
                 else if (cell.Entropy == minEntropy)
-                    minimumEntropyCells.Add(cell);
+                    minCells.Add(cell);
             }
         }
-        if (minimumEntropyCells.Count > 0)
-            return minimumEntropyCells[Random.Range(0, minimumEntropyCells.Count)];
+        if (minCells.Count > 0)
+            return minCells[Random.Range(0, minCells.Count)];
         return null;
     }
 
-    private void CollapseCell(Cell cell, bool isFinalRender)
+    void CollapseCellSimple(Cell cell, bool render)
     {
-        int chosenID;
-        if (cell.PossibleTileIDs == null || cell.PossibleTileIDs.Count == 0)
-        {
-            chosenID = AllTileIDs[Random.Range(0, AllTileIDs.Count)];
-        }
-        else
-        {
-            chosenID = CurrentRunMode == GenerationMode.SimpleTiled
-                ? cell.PossibleTileIDs[Random.Range(0, cell.PossibleTileIDs.Count)]
-                : GetWeightedRandomTileID(cell.PossibleTileIDs);
-        }
-        cell.ChosenTileID = chosenID;
+        int chosen = cell.PossibleTileIDs[Random.Range(0, cell.PossibleTileIDs.Count)];
+        cell.ChosenTileID = chosen;
         cell.PossibleTileIDs.Clear();
-        cell.PossibleTileIDs.Add(chosenID);
+        cell.PossibleTileIDs.Add(chosen);
         cell.Collapsed = true;
-        if (isFinalRender)
+        if (render)
         {
-            if (CurrentRunMode == GenerationMode.SimpleTiled)
+            Tile t = AllTiles.FirstOrDefault(tt => tt.ID == chosen);
+            if (t != null && t.Prefab != null)
             {
-                Tile chosenTile = AllTiles.FirstOrDefault(t => t.ID == cell.ChosenTileID);
-                if (chosenTile != null && chosenTile.Prefab != null)
-                {
-                    float offset = (GridSize - 1) / 2f;
-                    float size = TileSize;
-                    if (Mathf.Approximately(TileSize, 0f))
-                    {
-                        Renderer rend = chosenTile.Prefab.GetComponentInChildren<Renderer>();
-                        size = (rend != null) ? rend.bounds.size.x : 1f;
-                    }
-                    Vector3 position = new Vector3(cell.Col * size - offset * size, offset * size - cell.Row * size, 0);
-                    Instantiate(chosenTile.Prefab, position, chosenTile.Prefab.transform.rotation, MapContainer.transform);
-                }
-            }
-            else
-            {
-                PatternData chosenPattern = AllPatterns.FirstOrDefault(p => p.ID == cell.ChosenTileID);
-                if (chosenPattern != null) RenderPattern(cell, chosenPattern);
+                float spacing = TileSize;
+                if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
+                float offset = (GridSize - 1) / 2f;
+                Vector3 pos = new Vector3(cell.Col * spacing - offset * spacing, offset * spacing - cell.Row * spacing, 0);
+                Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
             }
         }
     }
 
-    private void Propagate(Cell startCell)
+
+    float GetDefaultSpacing()
+    {
+        foreach (var t in AllTiles)
+        {
+            if (t == null || t.Prefab == null) continue;
+            Renderer rend = t.Prefab.GetComponentInChildren<Renderer>();
+            if (rend != null)
+            {
+                float s = rend.bounds.size.x;
+                if (s > 0.001f) return s;
+            }
+        }
+        return 1f;
+    }
+
+
+    void Propagate(Cell start)
     {
         var stack = new Stack<Cell>();
-        stack.Push(startCell);
+        stack.Push(start);
         while (stack.Count > 0)
         {
-            Cell currentCell = stack.Pop();
-            int r = currentCell.Row;
-            int c = currentCell.Col;
-            (int dr, int dc, string direction)[] neighbors =
-            {(-1,0,"UP"),(1,0,"DOWN"),(0,-1,"LEFT"),(0,1,"RIGHT")};
-            foreach (var (dr, dc, direction) in neighbors)
+            Cell current = stack.Pop();
+            int r = current.Row;
+            int c = current.Col;
+            (int dr, int dc)[] dirs = { (-1, 0), (1, 0), (0, -1), (0, 1) };
+            foreach (var (dr, dc) in dirs)
             {
                 int nr = r + dr;
                 int nc = c + dc;
                 if (nr >= 0 && nr < GridSize && nc >= 0 && nc < GridSize)
                 {
-                    Cell neighborCell = Grid[nr, nc];
-                    if (!neighborCell.Collapsed)
-                    {
-                        List<int> removedIDs = EnforceConstraints(currentCell, neighborCell, direction);
-                        if (removedIDs.Count > 0)
-                            stack.Push(neighborCell);
-                        if (neighborCell.PossibleTileIDs.Count == 0)
-                            neighborCell.PossibleTileIDs.AddRange(AllTileIDs);
-                    }
+                    Cell neighbor = Grid[nr, nc];
+                    if (!neighbor.Collapsed)
+                        stack.Push(neighbor);
                 }
             }
         }
     }
 
-    private List<int> EnforceConstraints(Cell sourceCell, Cell targetCell, string relation)
+    bool CheckIfDone()
     {
-        List<int> removableIDs = new List<int>();
-        foreach (int targetID in targetCell.PossibleTileIDs.ToList())
-        {
-            bool isCompatible = false;
-            foreach (int sourceID in sourceCell.PossibleTileIDs)
-            {
-                List<int> requiredCompatibility = new List<int>();
-                int dirIndex = 0;
-                if (CurrentRunMode == GenerationMode.SimpleTiled)
-                {
-                    Tile sourceTile = AllTiles.FirstOrDefault(t => t.ID == sourceID);
-                    if (sourceTile == null) continue;
-                    switch (relation)
-                    {
-                        case "UP": requiredCompatibility = sourceTile.UpCompatibility; break;
-                        case "DOWN": requiredCompatibility = sourceTile.DownCompatibility; break;
-                        case "LEFT": requiredCompatibility = sourceTile.LeftCompatibility; break;
-                        case "RIGHT": requiredCompatibility = sourceTile.RightCompatibility; break;
-                    }
-                }
-                else
-                {
-                    PatternData sourcePattern = AllPatterns.FirstOrDefault(p => p.ID == sourceID);
-                    if (sourcePattern == null) continue;
-                    switch (relation)
-                    {
-                        case "UP": dirIndex = 0; break;
-                        case "DOWN": dirIndex = 1; break;
-                        case "LEFT": dirIndex = 2; break;
-                        case "RIGHT": dirIndex = 3; break;
-                    }
-                    requiredCompatibility = sourcePattern.Adjacency[dirIndex];
-                }
-                if (requiredCompatibility.Contains(targetID))
-                {
-                    isCompatible = true;
-                    break;
-                }
-            }
-            if (!isCompatible) removableIDs.Add(targetID);
-        }
-        foreach (int id in removableIDs) targetCell.RemoveOption(id);
-        if (targetCell.PossibleTileIDs.Count == 0) targetCell.PossibleTileIDs.AddRange(AllTileIDs);
-        return removableIDs;
-    }
-
-    private bool CheckIfDone()
-    {
-        foreach (Cell cell in Grid)
-            if (!cell.Collapsed) return false;
+        foreach (Cell c in Grid)
+            if (!c.Collapsed) return false;
         return true;
-    }
-
-    private int GetWeightedRandomTileID(List<int> possibleIDs)
-    {
-        if (possibleIDs == null || possibleIDs.Count == 0) return -1;
-        float totalWeight = 0f;
-        foreach (int id in possibleIDs)
-        {
-            PatternData pattern = AllPatterns?.FirstOrDefault(p => p.ID == id);
-            if (pattern != null) totalWeight += Mathf.Max(0f, pattern.Weight);
-        }
-        if (totalWeight <= 0f) return possibleIDs[Random.Range(0, possibleIDs.Count)];
-        float randomValue = Random.Range(0f, totalWeight);
-        float currentWeight = 0f;
-        foreach (int id in possibleIDs)
-        {
-            PatternData pattern = AllPatterns?.FirstOrDefault(p => p.ID == id);
-            if (pattern == null) continue;
-            currentWeight += Mathf.Max(0f, pattern.Weight);
-            if (randomValue < currentWeight) return id;
-        }
-        return possibleIDs.Last();
-    }
-
-    private List<PatternData> ExtractPatternsAndRules(int[,] contextMatrix)
-    {
-        if (contextMatrix == null) return new List<PatternData>();
-        int sampleHeight = contextMatrix.GetLength(0);
-        int sampleWidth = contextMatrix.GetLength(1);
-        int patternIDCounter = 0;
-        int N = PatternSize;
-        if (sampleWidth < N || sampleHeight < N) return new List<PatternData>();
-        var uniquePatterns = new Dictionary<string, PatternData>();
-        var patternCounts = new Dictionary<string, int>();
-        for (int y = 0; y <= sampleHeight - N; y++)
-        {
-            for (int x = 0; x <= sampleWidth - N; x++)
-            {
-                int[] currentPatternArray = new int[N * N];
-                int index = 0;
-                for (int dy = 0; dy < N; dy++)
-                    for (int dx = 0; dx < N; dx++)
-                        currentPatternArray[index++] = contextMatrix[y + dy, x + dx];
-                string patternKey = string.Join(",", currentPatternArray);
-                if (!uniquePatterns.ContainsKey(patternKey))
-                {
-                    PatternData newPattern = new PatternData(patternIDCounter++, currentPatternArray, 0f);
-                    uniquePatterns.Add(patternKey, newPattern);
-                    patternCounts.Add(patternKey, 0);
-                }
-                patternCounts[patternKey]++;
-            }
-        }
-        foreach (var kvp in uniquePatterns)
-            kvp.Value.Weight = patternCounts[kvp.Key];
-        int maxOverlapY = sampleHeight - N;
-        int maxOverlapX = sampleWidth - N;
-        for (int y = 0; y <= maxOverlapY; y++)
-        {
-            for (int x = 0; x <= maxOverlapX; x++)
-            {
-                string currentKey = GetPatternKey(contextMatrix, x, y, N);
-                PatternData currentPattern = uniquePatterns[currentKey];
-                (int dx, int dy, int dirIndex)[] neighbors = { (0, -1, 0), (0, 1, 1), (-1, 0, 2), (1, 0, 3) };
-                foreach (var (dx, dy, dirIndex) in neighbors)
-                {
-                    int nx = x + dx;
-                    int ny = y + dy;
-                    if (nx >= 0 && nx <= maxOverlapX && ny >= 0 && ny <= maxOverlapY)
-                    {
-                        string neighborKey = GetPatternKey(contextMatrix, nx, ny, N);
-                        PatternData neighborPattern = uniquePatterns[neighborKey];
-                        if (!currentPattern.Adjacency[dirIndex].Contains(neighborPattern.ID))
-                            currentPattern.Adjacency[dirIndex].Add(neighborPattern.ID);
-                    }
-                }
-            }
-        }
-        foreach (var pattern in uniquePatterns.Values)
-            for (int i = 0; i < 4; i++)
-                if (pattern.Adjacency[i].Count == 0)
-                    pattern.Adjacency[i].AddRange(uniquePatterns.Values.Select(p => p.ID));
-        return uniquePatterns.Values.ToList();
-    }
-
-    private string GetPatternKey(int[,] grid, int startX, int startY, int N)
-    {
-        int[] patternArray = new int[N * N];
-        int index = 0;
-        for (int dy = 0; dy < N; dy++)
-            for (int dx = 0; dx < N; dx++)
-                patternArray[index++] = grid[startY + dy, startX + dx];
-        return string.Join(",", patternArray);
-    }
-
-    private void RenderPattern(Cell cell, PatternData pattern)
-    {
-        int N = PatternSize;
-        if (pattern == null || pattern.Pattern == null || pattern.Pattern.Length != N * N) return;
-        int tileToRenderID = pattern.Pattern[0];
-        Tile tileToRender = AllTiles.FirstOrDefault(t => t.ID == tileToRenderID);
-        if (tileToRender == null || tileToRender.Prefab == null) return;
-        float size = TileSize;
-        if (Mathf.Approximately(size, 0f))
-        {
-            Renderer rend = tileToRender.Prefab.GetComponentInChildren<Renderer>();
-            size = (rend != null) ? rend.bounds.size.x : 1f;
-        }
-        float halfMapWorld = (GridSize - 1) * size * 0.5f;
-        float xPos = cell.Col * size - halfMapWorld;
-        float yPos = halfMapWorld - cell.Row * size;
-        if (Mathf.Approximately(size, 1f))
-        {
-            xPos = Mathf.Round(xPos);
-            yPos = Mathf.Round(yPos);
-        }
-        Vector3 finalPosition = new Vector3(xPos, yPos, 0f);
-        Instantiate(tileToRender.Prefab, finalPosition, tileToRender.Prefab.transform.rotation, MapContainer.transform);
     }
 }
