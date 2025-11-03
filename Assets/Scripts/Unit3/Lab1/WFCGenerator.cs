@@ -241,7 +241,8 @@ public class WFCGenerator : MonoBehaviour
     void CleanupPreviousMap()
     {
         GameObject old = GameObject.Find("GeneratedMapContainer");
-        if (old != null) Destroy(old);
+        if (old != null) GameObject.Destroy(old);
+
     }
 
     void SaveState()
