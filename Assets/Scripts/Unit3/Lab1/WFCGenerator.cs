@@ -6,6 +6,7 @@ using System.Linq;
 public class WFCGenerator : MonoBehaviour
 {
     public enum GenerationMode { SimpleTiled, ComplexWFC }
+
     [Header("Configuración del Modo")]
     public GenerationMode Mode = GenerationMode.SimpleTiled;
     public bool UseCustomMatrix = false;
@@ -17,6 +18,9 @@ public class WFCGenerator : MonoBehaviour
     public int FinalOverlappingGridSize = 10;
     public float StepDelay = 0.05f;
     public float TileSize = 1f;
+
+    [Header("Visualización Complex WFC")]
+    public float ContextMatrixDisplayTime = 3f;
 
     private Cell[,] Grid;
     private List<int> AllTileIDs;
@@ -32,13 +36,20 @@ public class WFCGenerator : MonoBehaviour
         if (AllTiles == null || AllTiles.Length == 0) return;
         CleanupPreviousMap();
         if (Mode == GenerationMode.SimpleTiled)
+        {
+            CurrentRunMode = GenerationMode.SimpleTiled;
             StartCoroutine(SimpleTiledWFC(SimpleTiledContextGridSize, true));
+        }
         else if (Mode == GenerationMode.ComplexWFC)
+        {
+            CurrentRunMode = GenerationMode.ComplexWFC;
             StartCoroutine(ProbabilisticWFC());
+        }
     }
 
     public IEnumerator SimpleTiledWFC(int targetGridSize, bool isFinalRender)
     {
+        CurrentRunMode = GenerationMode.SimpleTiled;
         InitializeGrid(targetGridSize);
         if (AllTileIDs == null || AllTileIDs.Count == 0) yield break;
         int safetyCounter = 0;
@@ -83,6 +94,8 @@ public class WFCGenerator : MonoBehaviour
     IEnumerator ProbabilisticWFC()
     {
         int[,] sourceMatrix = null;
+        CurrentRunMode = GenerationMode.ComplexWFC;
+
         if (UseCustomMatrix && ManualMatrix != null && ManualMatrix.rows.Count > 0)
             sourceMatrix = ManualMatrix.ToArray();
         else
@@ -92,9 +105,46 @@ public class WFCGenerator : MonoBehaviour
         }
         if (sourceMatrix == null) yield break;
 
+        RenderGeneratedMatrix(sourceMatrix);
+        yield return new WaitForSeconds(ContextMatrixDisplayTime);
+
+        CleanupPreviousMap();
         adjacencyProbs = ComputeAdjacencyProbabilities(sourceMatrix);
-        int[,] result = GenerateMatrixByProbability(FinalOverlappingGridSize, sourceMatrix, adjacencyProbs);
-        RenderGeneratedMatrix(result);
+
+        AllTileIDs = sourceMatrix.Cast<int>().Distinct().ToList();
+        InitializeGrid(FinalOverlappingGridSize);
+
+        int safetyCounter = 0;
+        int safetyLimit = FinalOverlappingGridSize * FinalOverlappingGridSize * 50;
+
+        while (!CheckIfDone() && safetyCounter < safetyLimit)
+        {
+            safetyCounter++;
+            Cell cellToCollapse = FindCellWithMinEntropy();
+
+            if (cellToCollapse == null || cellToCollapse.IsContradiction)
+            {
+                if (HistoryStack.Count > 0)
+                {
+                    Grid = HistoryStack.Pop();
+                    yield return null;
+                    continue;
+                }
+                else
+                {
+                    if (CheckIfDone()) break;
+                    InitializeGrid(FinalOverlappingGridSize);
+                    yield return null;
+                    continue;
+                }
+            }
+
+            SaveState();
+            CollapseCellProbabilistic(cellToCollapse, true);
+            Propagate(cellToCollapse);
+
+            yield return new WaitForSeconds(StepDelay);
+        }
         yield return null;
     }
 
@@ -151,57 +201,6 @@ public class WFCGenerator : MonoBehaviour
         dict[neighbor]++;
     }
 
-    int[,] GenerateMatrixByProbability(int size, int[,] source, Dictionary<int, Dictionary<string, Dictionary<int, float>>> probs)
-    {
-        int[,] result = new int[size, size];
-        int[] allValues = source.Cast<int>().Distinct().ToArray();
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                if (y == 0 && x == 0)
-                {
-                    result[y, x] = allValues[Random.Range(0, allValues.Length)];
-                    continue;
-                }
-
-                Dictionary<int, float> combined = new Dictionary<int, float>();
-
-                void MergeProb(int centerVal, string dir)
-                {
-                    if (!probs.ContainsKey(centerVal)) return;
-                    foreach (var kv in probs[centerVal][dir])
-                    {
-                        if (!combined.ContainsKey(kv.Key)) combined[kv.Key] = 0;
-                        combined[kv.Key] += kv.Value;
-                    }
-                }
-
-                if (y > 0) MergeProb(result[y - 1, x], "DOWN");
-                if (x > 0) MergeProb(result[y, x - 1], "RIGHT");
-
-                if (combined.Count == 0)
-                    result[y, x] = allValues[Random.Range(0, allValues.Length)];
-                else
-                {
-                    float total = combined.Values.Sum();
-                    float rand = Random.Range(0f, total);
-                    float acc = 0;
-                    foreach (var kv in combined)
-                    {
-                        acc += kv.Value;
-                        if (rand <= acc)
-                        {
-                            result[y, x] = kv.Key;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        return result;
-    }
-
     void RenderGeneratedMatrix(int[,] matrix)
     {
         CleanupPreviousMap();
@@ -231,7 +230,11 @@ public class WFCGenerator : MonoBehaviour
         CleanupPreviousMap();
         HistoryStack.Clear();
         MapContainer = new GameObject("GeneratedMapContainer");
-        AllTileIDs = AllTiles.Select(t => t.ID).ToList();
+
+        // Usa AllTileIDs ya populado por ProbabilisticWFC si es Complex, sino usa AllTiles.
+        if (CurrentRunMode == GenerationMode.SimpleTiled || AllTileIDs == null || AllTileIDs.Count == 0)
+            AllTileIDs = AllTiles.Select(t => t.ID).ToList();
+
         Grid = new Cell[GridSize, GridSize];
         for (int r = 0; r < GridSize; r++)
             for (int c = 0; c < GridSize; c++)
@@ -242,7 +245,6 @@ public class WFCGenerator : MonoBehaviour
     {
         GameObject old = GameObject.Find("GeneratedMapContainer");
         if (old != null) GameObject.Destroy(old);
-
     }
 
     void SaveState()
@@ -296,6 +298,100 @@ public class WFCGenerator : MonoBehaviour
                 Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
             }
         }
+    }
+
+    void CollapseCellProbabilistic(Cell cell, bool render)
+    {
+        Dictionary<int, float> combinedProbabilities = new Dictionary<int, float>();
+
+        (int dr, int dc, string direction)[] neighbors =
+        {(-1,0,"UP"),(1,0,"DOWN"),(0,-1,"LEFT"),(0,1,"RIGHT")};
+
+        float neighborCount = 0;
+
+        foreach (var (dr, dc, direction) in neighbors)
+        {
+            int nr = cell.Row + dr;
+            int nc = cell.Col + dc;
+
+            if (nr >= 0 && nr < GridSize && nc >= 0 && nc < GridSize)
+            {
+                Cell neighbor = Grid[nr, nc];
+                if (neighbor.Collapsed)
+                {
+                    neighborCount++;
+                    int neighborID = neighbor.ChosenTileID;
+
+                    string inverseDir = "";
+                    if (direction == "UP") inverseDir = "DOWN";
+                    else if (direction == "DOWN") inverseDir = "UP";
+                    else if (direction == "LEFT") inverseDir = "RIGHT";
+                    else if (direction == "RIGHT") inverseDir = "LEFT";
+
+                    if (adjacencyProbs.ContainsKey(neighborID) && adjacencyProbs[neighborID].ContainsKey(inverseDir))
+                    {
+                        foreach (var kvp in adjacencyProbs[neighborID][inverseDir])
+                        {
+                            int targetID = kvp.Key;
+                            float prob = kvp.Value;
+
+                            if (cell.PossibleTileIDs.Contains(targetID))
+                            {
+                                if (!combinedProbabilities.ContainsKey(targetID))
+                                    combinedProbabilities[targetID] = 0f;
+
+                                combinedProbabilities[targetID] += prob;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (combinedProbabilities.Count == 0)
+        {
+            foreach (int id in cell.PossibleTileIDs)
+                combinedProbabilities[id] = 1f;
+        }
+
+        int chosen = ChooseTileByWeightedRandom(combinedProbabilities);
+
+        cell.ChosenTileID = chosen;
+        cell.PossibleTileIDs.Clear();
+        cell.PossibleTileIDs.Add(chosen);
+        cell.Collapsed = true;
+
+        if (render)
+        {
+            Tile t = AllTiles.FirstOrDefault(tt => tt.ID == chosen);
+            if (t != null && t.Prefab != null)
+            {
+                float spacing = TileSize;
+                if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
+                float offset = (GridSize - 1) / 2f;
+                Vector3 pos = new Vector3(cell.Col * spacing - offset * spacing, offset * spacing - cell.Row * spacing, 0);
+                Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
+            }
+        }
+    }
+
+    private int ChooseTileByWeightedRandom(Dictionary<int, float> weights)
+    {
+        if (weights.Count == 0) return AllTileIDs[Random.Range(0, AllTileIDs.Count)];
+
+        float totalWeight = weights.Values.Sum();
+        if (totalWeight <= 0) return weights.Keys.First();
+
+        float randomValue = Random.Range(0f, totalWeight);
+        float currentWeight = 0f;
+
+        foreach (var kvp in weights)
+        {
+            currentWeight += kvp.Value;
+            if (randomValue < currentWeight) return kvp.Key;
+        }
+
+        return weights.Keys.Last();
     }
 
 
@@ -355,6 +451,7 @@ public class WFCGenerator : MonoBehaviour
             foreach (int sourceID in sourceCell.PossibleTileIDs)
             {
                 List<int> requiredCompatibility = new List<int>();
+
                 if (CurrentRunMode == GenerationMode.SimpleTiled)
                 {
                     Tile sourceTile = AllTiles.FirstOrDefault(t => t.ID == sourceID);
@@ -366,15 +463,27 @@ public class WFCGenerator : MonoBehaviour
                         case "LEFT": requiredCompatibility = sourceTile.LeftCompatibility; break;
                         case "RIGHT": requiredCompatibility = sourceTile.RightCompatibility; break;
                     }
+                    if (requiredCompatibility.Contains(targetID))
+                    {
+                        isCompatible = true;
+                        break;
+                    }
                 }
-                if (requiredCompatibility.Contains(targetID))
+                else if (CurrentRunMode == GenerationMode.ComplexWFC)
                 {
-                    isCompatible = true;
-                    break;
+                    if (adjacencyProbs.ContainsKey(sourceID) &&
+                        adjacencyProbs[sourceID].ContainsKey(relation) &&
+                        adjacencyProbs[sourceID][relation].ContainsKey(targetID) &&
+                        adjacencyProbs[sourceID][relation][targetID] > 0)
+                    {
+                        isCompatible = true;
+                        break;
+                    }
                 }
             }
             if (!isCompatible) removableIDs.Add(targetID);
         }
+
         foreach (int id in removableIDs) targetCell.RemoveOption(id);
         if (targetCell.PossibleTileIDs.Count == 0) targetCell.PossibleTileIDs.AddRange(AllTileIDs);
         return removableIDs;

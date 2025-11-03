@@ -254,9 +254,10 @@ MonoBehaviour:
     LeftCompatibility: 000000000100000007000000090000000a000000
     RightCompatibility: 0200000003000000040000000600000007000000090000000a000000
   SimpleTiledContextGridSize: 10
-  FinalOverlappingGridSize: 10
+  FinalOverlappingGridSize: 20
   StepDelay: 0.01
   TileSize: 0
+  ContextMatrixDisplayTime: 5
 --- !u!4 &583782450
 Transform:
   m_ObjectHideFlags: 0
@@ -389,6 +390,7 @@ MonoBehaviour:
   FinalOverlappingGridSize: 5
   StepDelay: 0.01
   TileSize: 0
+  ContextMatrixDisplayTime: 3
 --- !u!1 &1997139894
 GameObject:
   m_ObjectHideFlags: 0
