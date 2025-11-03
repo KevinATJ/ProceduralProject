@@ -10,7 +10,6 @@ public class WFCGenerator : MonoBehaviour
     public GenerationMode Mode = GenerationMode.SimpleTiled;
     public bool UseCustomMatrix = false;
     public EditableMatrix ManualMatrix;
-    public int PatternSize = 3;
 
     [Header("Configuración")]
     public Tile[] AllTiles;
@@ -321,22 +320,63 @@ public class WFCGenerator : MonoBehaviour
         stack.Push(start);
         while (stack.Count > 0)
         {
-            Cell current = stack.Pop();
-            int r = current.Row;
-            int c = current.Col;
-            (int dr, int dc)[] dirs = { (-1, 0), (1, 0), (0, -1), (0, 1) };
-            foreach (var (dr, dc) in dirs)
+            Cell currentCell = stack.Pop();
+            int r = currentCell.Row;
+            int c = currentCell.Col;
+            (int dr, int dc, string direction)[] neighbors =
+            {(-1,0,"UP"),(1,0,"DOWN"),(0,-1,"LEFT"),(0,1,"RIGHT")};
+            foreach (var (dr, dc, direction) in neighbors)
             {
                 int nr = r + dr;
                 int nc = c + dc;
                 if (nr >= 0 && nr < GridSize && nc >= 0 && nc < GridSize)
                 {
-                    Cell neighbor = Grid[nr, nc];
-                    if (!neighbor.Collapsed)
-                        stack.Push(neighbor);
+                    Cell neighborCell = Grid[nr, nc];
+                    if (!neighborCell.Collapsed)
+                    {
+                        List<int> removedIDs = EnforceConstraints(currentCell, neighborCell, direction);
+                        if (removedIDs.Count > 0)
+                            stack.Push(neighborCell);
+                        if (neighborCell.PossibleTileIDs.Count == 0)
+                            neighborCell.PossibleTileIDs.AddRange(AllTileIDs);
+                    }
                 }
             }
         }
+    }
+
+    private List<int> EnforceConstraints(Cell sourceCell, Cell targetCell, string relation)
+    {
+        List<int> removableIDs = new List<int>();
+        foreach (int targetID in targetCell.PossibleTileIDs.ToList())
+        {
+            bool isCompatible = false;
+            foreach (int sourceID in sourceCell.PossibleTileIDs)
+            {
+                List<int> requiredCompatibility = new List<int>();
+                if (CurrentRunMode == GenerationMode.SimpleTiled)
+                {
+                    Tile sourceTile = AllTiles.FirstOrDefault(t => t.ID == sourceID);
+                    if (sourceTile == null) continue;
+                    switch (relation)
+                    {
+                        case "UP": requiredCompatibility = sourceTile.UpCompatibility; break;
+                        case "DOWN": requiredCompatibility = sourceTile.DownCompatibility; break;
+                        case "LEFT": requiredCompatibility = sourceTile.LeftCompatibility; break;
+                        case "RIGHT": requiredCompatibility = sourceTile.RightCompatibility; break;
+                    }
+                }
+                if (requiredCompatibility.Contains(targetID))
+                {
+                    isCompatible = true;
+                    break;
+                }
+            }
+            if (!isCompatible) removableIDs.Add(targetID);
+        }
+        foreach (int id in removableIDs) targetCell.RemoveOption(id);
+        if (targetCell.PossibleTileIDs.Count == 0) targetCell.PossibleTileIDs.AddRange(AllTileIDs);
+        return removableIDs;
     }
 
     bool CheckIfDone()
