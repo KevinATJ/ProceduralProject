@@ -5,14 +5,14 @@ using System.Linq;
 
 public class WFCGenerator : MonoBehaviour
 {
-    public enum GenerationMode { SimpleTiled, ComplexWFC }
+    public enum GenerationMode { SimpleTiled, ComplexWFC, MarkovNGram }
 
     [Header("Configuración del Modo")]
     public GenerationMode Mode = GenerationMode.SimpleTiled;
     public bool UseCustomMatrix = false;
     public EditableMatrix ManualMatrix;
 
-    [Header("Configuración")]
+    [Header("Configuración general")]
     public Tile[] AllTiles;
     public int SimpleTiledContextGridSize = 10;
     public int FinalOverlappingGridSize = 10;
@@ -20,16 +20,23 @@ public class WFCGenerator : MonoBehaviour
     public float TileSize = 1f;
 
     [Header("Visualización Complex WFC")]
-    public float ContextMatrixDisplayTime = 3f;
+    public float ContextMatrixDisplayTime = 2f;
+
+    [Header("Markov N-gram")]
+    [Range(1, 5)] public int MarkovN = 2;
+    public int MarkovGridSize = 10;
+    public bool MarkovStepByStep = false;
+    public float MarkovStepDelay = 0.02f;
 
     private Cell[,] Grid;
     private List<int> AllTileIDs;
     private Stack<Cell[,]> HistoryStack = new Stack<Cell[,]>();
     private GameObject MapContainer;
-    private int[,] GeneratedContextMatrix;
+    public int[,] GeneratedContextMatrix;
     private int GridSize;
     private GenerationMode CurrentRunMode;
     private Dictionary<int, Dictionary<string, Dictionary<int, float>>> adjacencyProbs;
+    private Dictionary<string, Dictionary<int, int>> markovModel;
 
     void Start()
     {
@@ -45,6 +52,18 @@ public class WFCGenerator : MonoBehaviour
             CurrentRunMode = GenerationMode.ComplexWFC;
             StartCoroutine(ProbabilisticWFC());
         }
+        else if (Mode == GenerationMode.MarkovNGram)
+        {
+            CurrentRunMode = GenerationMode.MarkovNGram;
+            StartCoroutine(MarkovCoroutine());
+        }
+    }
+
+    public void GenerateLevelMarkov(int[,] examples, int n)
+    {
+        MarkovN = n;
+        LearnMarkovFromMatrixRowMajor(examples, MarkovN);
+        StartCoroutine(MarkovGenerateFromModel());
     }
 
     public IEnumerator SimpleTiledWFC(int targetGridSize, bool isFinalRender)
@@ -148,24 +167,208 @@ public class WFCGenerator : MonoBehaviour
         yield return null;
     }
 
+    IEnumerator MarkovCoroutine()
+    {
+        int[,] sourceMatrix = null;
+        if (UseCustomMatrix && ManualMatrix != null && ManualMatrix.rows.Count > 0)
+            sourceMatrix = ManualMatrix.ToArray();
+        else
+        {
+            yield return StartCoroutine(SimpleTiledWFC(SimpleTiledContextGridSize, false));
+            sourceMatrix = GeneratedContextMatrix;
+        }
+        if (sourceMatrix == null) yield break;
+
+        RenderGeneratedMatrix(sourceMatrix);
+        yield return new WaitForSeconds(ContextMatrixDisplayTime);
+        CleanupPreviousMap();
+        LearnMarkovFromMatrixRowMajor(sourceMatrix, MarkovN);
+
+        AllTileIDs = sourceMatrix.Cast<int>().Distinct().ToList();
+        InitializeGrid(MarkovGridSize);
+        MapContainer = new GameObject("GeneratedMapContainer");
+        for (int r = 0; r < GridSize; r++)
+        {
+            for (int c = 0; c < GridSize; c++)
+            {
+                Dictionary<int, float> combined = new Dictionary<int, float>();
+                int[] context = GetGeneratedContextForPositionRowMajor(r, c);
+                if (context != null)
+                {
+                    string key = string.Join(",", context);
+                    if (markovModel.ContainsKey(key))
+                    {
+                        foreach (var kv in markovModel[key])
+                        {
+                            if (!combined.ContainsKey(kv.Key)) combined[kv.Key] = 0f;
+                            combined[kv.Key] += kv.Value;
+                        }
+                    }
+                }
+                if (combined.Count == 0)
+                {
+                    foreach (int id in AllTileIDs)
+                        combined[id] = 1f;
+                }
+                int chosen = ChooseByFloatWeights(combined);
+                Grid[r, c].ChosenTileID = chosen;
+                Grid[r, c].PossibleTileIDs.Clear();
+                Grid[r, c].PossibleTileIDs.Add(chosen);
+                Grid[r, c].Collapsed = true;
+                Tile t = AllTiles.FirstOrDefault(tt => tt.ID == chosen);
+                if (t != null && t.Prefab != null)
+                {
+                    float spacing = TileSize;
+                    if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
+                    float halfMapWorld = (GridSize - 1) * spacing * 0.5f;
+                    Vector3 pos = new Vector3(c * spacing - halfMapWorld, halfMapWorld - r * spacing, 0f);
+                    Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
+                }
+                if (MarkovStepByStep) yield return new WaitForSeconds(MarkovStepDelay);
+            }
+        }
+        yield return null;
+    }
+
+    IEnumerator MarkovGenerateFromModel()
+    {
+        InitializeGrid(MarkovGridSize);
+        MapContainer = new GameObject("GeneratedMapContainer");
+        AllTileIDs = AllTiles.Select(t => t.ID).ToList();
+        int total = GridSize * GridSize;
+        List<int> seq = GenerateSequenceFromModel(total);
+        int idx = 0;
+        for (int r = 0; r < GridSize; r++)
+        {
+            for (int c = 0; c < GridSize; c++)
+            {
+                int chosen = seq[idx++];
+                Grid[r, c].ChosenTileID = chosen;
+                Grid[r, c].PossibleTileIDs.Clear();
+                Grid[r, c].PossibleTileIDs.Add(chosen);
+                Grid[r, c].Collapsed = true;
+                Tile t = AllTiles.FirstOrDefault(tt => tt.ID == chosen);
+                if (t != null && t.Prefab != null)
+                {
+                    float spacing = TileSize;
+                    if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
+                    float halfMapWorld = (GridSize - 1) * spacing * 0.5f;
+                    Vector3 pos = new Vector3((c) * spacing - halfMapWorld, halfMapWorld - (r) * spacing, 0f);
+                    Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
+                }
+                if (MarkovStepByStep) yield return new WaitForSeconds(MarkovStepDelay);
+            }
+        }
+        yield return null;
+    }
+
+    int[] GetGeneratedContextForPositionRowMajor(int r, int c)
+    {
+        int index = r * GridSize + c;
+        List<int> hist = new List<int>();
+        for (int i = index - MarkovN; i < index; i++)
+        {
+            if (i < 0) return null;
+            int rr = i / GridSize;
+            int cc = i % GridSize;
+            Cell ccCell = Grid[rr, cc];
+            if (!ccCell.Collapsed) return null;
+            hist.Add(ccCell.ChosenTileID);
+        }
+        if (hist.Count != MarkovN) return null;
+        return hist.ToArray();
+    }
+
+    List<int> GenerateSequenceFromModel(int length)
+    {
+        List<int> output = new List<int>();
+        if (markovModel == null || markovModel.Count == 0)
+        {
+            for (int i = 0; i < length; i++) output.Add(AllTileIDs[Random.Range(0, AllTileIDs.Count)]);
+            return output;
+        }
+        string seed = markovModel.Keys.ElementAt(Random.Range(0, markovModel.Keys.Count));
+        var parts = seed.Split(',').Select(s => int.Parse(s)).ToArray();
+        foreach (var p in parts) output.Add(p);
+        while (output.Count < length)
+        {
+            string key = string.Join(",", output.Skip(output.Count - MarkovN).Take(MarkovN));
+            if (!markovModel.ContainsKey(key))
+            {
+                output.Add(AllTileIDs[Random.Range(0, AllTileIDs.Count)]);
+                continue;
+            }
+            var options = markovModel[key];
+            int next = WeightedPick(options);
+            output.Add(next);
+        }
+        return output;
+    }
+
+    int WeightedPick(Dictionary<int, int> dict)
+    {
+        int sum = dict.Values.Sum();
+        int roll = Random.Range(0, sum);
+        int cumulative = 0;
+        foreach (var pair in dict)
+        {
+            cumulative += pair.Value;
+            if (roll < cumulative) return pair.Key;
+        }
+        return dict.Keys.First();
+    }
+
+    void LearnMarkovFromMatrixRowMajor(int[,] matrix, int N)
+    {
+        markovModel = new Dictionary<string, Dictionary<int, int>>();
+        int h = matrix.GetLength(0);
+        int w = matrix.GetLength(1);
+        List<int> seq = new List<int>();
+        for (int r = 0; r < h; r++)
+            for (int c = 0; c < w; c++)
+                seq.Add(matrix[r, c]);
+        if (seq.Count <= N) return;
+        for (int i = 0; i <= seq.Count - N - 1; i++)
+        {
+            string key = string.Join(",", seq.Skip(i).Take(N));
+            int next = seq[i + N];
+            if (!markovModel.ContainsKey(key)) markovModel[key] = new Dictionary<int, int>();
+            if (!markovModel[key].ContainsKey(next)) markovModel[key][next] = 0;
+            markovModel[key][next]++;
+        }
+    }
+
+    int ChooseByFloatWeights(Dictionary<int, float> weights)
+    {
+        if (weights.Count == 0) return AllTileIDs[Random.Range(0, AllTileIDs.Count)];
+        float total = weights.Values.Sum();
+        if (total <= 0f) return weights.Keys.First();
+        float r = Random.Range(0f, total);
+        float acc = 0f;
+        foreach (var kv in weights)
+        {
+            acc += kv.Value;
+            if (r <= acc) return kv.Key;
+        }
+        return weights.Keys.Last();
+    }
+
     Dictionary<int, Dictionary<string, Dictionary<int, float>>> ComputeAdjacencyProbabilities(int[,] matrix)
     {
         var result = new Dictionary<int, Dictionary<string, Dictionary<int, float>>>();
         int h = matrix.GetLength(0);
         int w = matrix.GetLength(1);
         string[] dirs = { "UP", "DOWN", "LEFT", "RIGHT" };
-
         foreach (string d in dirs)
             foreach (int val in matrix)
                 if (!result.ContainsKey(val))
                     result[val] = new Dictionary<string, Dictionary<int, float>>()
-                    {
-                        {"UP", new Dictionary<int,float>()},
-                        {"DOWN", new Dictionary<int,float>()},
-                        {"LEFT", new Dictionary<int,float>()},
-                        {"RIGHT", new Dictionary<int,float>()}
-                    };
-
+                {
+                    {"UP", new Dictionary<int,float>()},
+                    {"DOWN", new Dictionary<int,float>()},
+                    {"LEFT", new Dictionary<int,float>()},
+                    {"RIGHT", new Dictionary<int,float>()}
+                };
         for (int y = 0; y < h; y++)
         {
             for (int x = 0; x < w; x++)
@@ -177,7 +380,6 @@ public class WFCGenerator : MonoBehaviour
                 if (x < w - 1) AddProb(result[v]["RIGHT"], matrix[y, x + 1]);
             }
         }
-
         foreach (var valPair in result)
         {
             foreach (var dirPair in valPair.Value)
@@ -191,7 +393,6 @@ public class WFCGenerator : MonoBehaviour
                 }
             }
         }
-
         return result;
     }
 
@@ -223,17 +424,14 @@ public class WFCGenerator : MonoBehaviour
         }
     }
 
-
     void InitializeGrid(int size)
     {
         GridSize = size;
         CleanupPreviousMap();
         HistoryStack.Clear();
         MapContainer = new GameObject("GeneratedMapContainer");
-
         if (CurrentRunMode == GenerationMode.SimpleTiled || AllTileIDs == null || AllTileIDs.Count == 0)
             AllTileIDs = AllTiles.Select(t => t.ID).ToList();
-
         Grid = new Cell[GridSize, GridSize];
         for (int r = 0; r < GridSize; r++)
             for (int c = 0; c < GridSize; c++)
@@ -280,6 +478,8 @@ public class WFCGenerator : MonoBehaviour
 
     void CollapseCellSimple(Cell cell, bool render)
     {
+        if (cell.PossibleTileIDs == null || cell.PossibleTileIDs.Count == 0)
+            cell.PossibleTileIDs = new List<int>(AllTileIDs);
         int chosen = cell.PossibleTileIDs[Random.Range(0, cell.PossibleTileIDs.Count)];
         cell.ChosenTileID = chosen;
         cell.PossibleTileIDs.Clear();
@@ -302,17 +502,13 @@ public class WFCGenerator : MonoBehaviour
     void CollapseCellProbabilistic(Cell cell, bool render)
     {
         Dictionary<int, float> combinedProbabilities = new Dictionary<int, float>();
-
         (int dr, int dc, string direction)[] neighbors =
         {(-1,0,"UP"),(1,0,"DOWN"),(0,-1,"LEFT"),(0,1,"RIGHT")};
-
         float neighborCount = 0;
-
         foreach (var (dr, dc, direction) in neighbors)
         {
             int nr = cell.Row + dr;
             int nc = cell.Col + dc;
-
             if (nr >= 0 && nr < GridSize && nc >= 0 && nc < GridSize)
             {
                 Cell neighbor = Grid[nr, nc];
@@ -320,25 +516,21 @@ public class WFCGenerator : MonoBehaviour
                 {
                     neighborCount++;
                     int neighborID = neighbor.ChosenTileID;
-
                     string inverseDir = "";
                     if (direction == "UP") inverseDir = "DOWN";
                     else if (direction == "DOWN") inverseDir = "UP";
                     else if (direction == "LEFT") inverseDir = "RIGHT";
                     else if (direction == "RIGHT") inverseDir = "LEFT";
-
                     if (adjacencyProbs.ContainsKey(neighborID) && adjacencyProbs[neighborID].ContainsKey(inverseDir))
                     {
                         foreach (var kvp in adjacencyProbs[neighborID][inverseDir])
                         {
                             int targetID = kvp.Key;
                             float prob = kvp.Value;
-
                             if (cell.PossibleTileIDs.Contains(targetID))
                             {
                                 if (!combinedProbabilities.ContainsKey(targetID))
                                     combinedProbabilities[targetID] = 0f;
-
                                 combinedProbabilities[targetID] += prob;
                             }
                         }
@@ -346,20 +538,16 @@ public class WFCGenerator : MonoBehaviour
                 }
             }
         }
-
         if (combinedProbabilities.Count == 0)
         {
             foreach (int id in cell.PossibleTileIDs)
                 combinedProbabilities[id] = 1f;
         }
-
         int chosen = ChooseTileByWeightedRandom(combinedProbabilities);
-
         cell.ChosenTileID = chosen;
         cell.PossibleTileIDs.Clear();
         cell.PossibleTileIDs.Add(chosen);
         cell.Collapsed = true;
-
         if (render)
         {
             Tile t = AllTiles.FirstOrDefault(tt => tt.ID == chosen);
@@ -377,22 +565,17 @@ public class WFCGenerator : MonoBehaviour
     private int ChooseTileByWeightedRandom(Dictionary<int, float> weights)
     {
         if (weights.Count == 0) return AllTileIDs[Random.Range(0, AllTileIDs.Count)];
-
         float totalWeight = weights.Values.Sum();
         if (totalWeight <= 0) return weights.Keys.First();
-
         float randomValue = Random.Range(0f, totalWeight);
         float currentWeight = 0f;
-
         foreach (var kvp in weights)
         {
             currentWeight += kvp.Value;
             if (randomValue < currentWeight) return kvp.Key;
         }
-
         return weights.Keys.Last();
     }
-
 
     float GetDefaultSpacing()
     {
@@ -408,7 +591,6 @@ public class WFCGenerator : MonoBehaviour
         }
         return 1f;
     }
-
 
     void Propagate(Cell start)
     {
@@ -479,6 +661,14 @@ public class WFCGenerator : MonoBehaviour
                         break;
                     }
                 }
+                else if (CurrentRunMode == GenerationMode.MarkovNGram)
+                {
+                    if (AllTileIDs.Contains(targetID))
+                    {
+                        isCompatible = true;
+                        break;
+                    }
+                }
             }
             if (!isCompatible) removableIDs.Add(targetID);
         }
@@ -494,4 +684,6 @@ public class WFCGenerator : MonoBehaviour
             if (!c.Collapsed) return false;
         return true;
     }
+
+
 }

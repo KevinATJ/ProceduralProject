@@ -134,7 +134,7 @@ GameObject:
   - component: {fileID: 583782449}
   - component: {fileID: 583782451}
   m_Layer: 0
-  m_Name: Map
+  m_Name: WFC_Map
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -152,7 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0050dbeaa144bec4eac1cc81086e1416, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Mode: 1
+  Mode: 2
   UseCustomMatrix: 1
   ManualMatrix:
     width: 9
@@ -258,6 +258,10 @@ MonoBehaviour:
   StepDelay: 0.01
   TileSize: 0
   ContextMatrixDisplayTime: 5
+  MarkovN: 3
+  MarkovGridSize: 10
+  MarkovStepByStep: 1
+  MarkovStepDelay: 0.02
 --- !u!4 &583782450
 Transform:
   m_ObjectHideFlags: 0
@@ -391,6 +395,10 @@ MonoBehaviour:
   StepDelay: 0.01
   TileSize: 0
   ContextMatrixDisplayTime: 3
+  MarkovN: 2
+  MarkovGridSize: 10
+  MarkovStepByStep: 0
+  MarkovStepDelay: 0.02
 --- !u!1 &1997139894
 GameObject:
   m_ObjectHideFlags: 0
