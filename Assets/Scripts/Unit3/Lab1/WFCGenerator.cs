@@ -28,6 +28,9 @@ public class WFCGenerator : MonoBehaviour
     public bool MarkovColumnStepByStep = false;
     public float MarkovColumnStepDelay = 0.02f;
 
+    [SerializeField]
+    GameObject Transcriptor;
+
     private Cell[,] Grid;
     private List<int> AllTileIDs;
     private Stack<Cell[,]> HistoryStack = new Stack<Cell[,]>();
