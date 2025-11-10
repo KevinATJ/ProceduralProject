@@ -134,7 +134,7 @@ GameObject:
   - component: {fileID: 583782449}
   - component: {fileID: 583782451}
   m_Layer: 0
-  m_Name: WFC_Map
+  m_Name: Map
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -147,7 +147,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 583782448}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0050dbeaa144bec4eac1cc81086e1416, type: 3}
   m_Name: 
@@ -258,10 +258,10 @@ MonoBehaviour:
   StepDelay: 0.01
   TileSize: 0
   ContextMatrixDisplayTime: 5
-  MarkovN: 3
-  MarkovGridSize: 10
-  MarkovStepByStep: 1
-  MarkovStepDelay: 0.02
+  MarkovColumnN: 1
+  MarkovColumnGridWidth: 10
+  MarkovColumnStepByStep: 1
+  MarkovColumnStepDelay: 0.02
 --- !u!4 &583782450
 Transform:
   m_ObjectHideFlags: 0
@@ -284,12 +284,12 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 583782448}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0050dbeaa144bec4eac1cc81086e1416, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Mode: 1
+  Mode: 2
   UseCustomMatrix: 1
   ManualMatrix:
     width: 10
@@ -300,8 +300,8 @@ MonoBehaviour:
     - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
     - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
     - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
-    - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
-    - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+    - values: 02000000020000000a000000000000000b000000020000000a0000000b000000020000000a000000
+    - values: 00000000000000000800000002000000090000000000000008000000090000000000000008000000
     - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
     - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
     - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -395,10 +395,10 @@ MonoBehaviour:
   StepDelay: 0.01
   TileSize: 0
   ContextMatrixDisplayTime: 3
-  MarkovN: 2
-  MarkovGridSize: 10
-  MarkovStepByStep: 0
-  MarkovStepDelay: 0.02
+  MarkovColumnN: 1
+  MarkovColumnGridWidth: 30
+  MarkovColumnStepByStep: 1
+  MarkovColumnStepDelay: 0.02
 --- !u!1 &1997139894
 GameObject:
   m_ObjectHideFlags: 0

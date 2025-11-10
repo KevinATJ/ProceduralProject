@@ -23,10 +23,10 @@ public class WFCGenerator : MonoBehaviour
     public float ContextMatrixDisplayTime = 2f;
 
     [Header("Markov N-gram")]
-    [Range(1, 5)] public int MarkovN = 2;
-    public int MarkovGridSize = 10;
-    public bool MarkovStepByStep = false;
-    public float MarkovStepDelay = 0.02f;
+    [Range(1, 5)] public int MarkovColumnN = 2;
+    public int MarkovColumnGridWidth = 10;
+    public bool MarkovColumnStepByStep = false;
+    public float MarkovColumnStepDelay = 0.02f;
 
     private Cell[,] Grid;
     private List<int> AllTileIDs;
@@ -36,7 +36,7 @@ public class WFCGenerator : MonoBehaviour
     private int GridSize;
     private GenerationMode CurrentRunMode;
     private Dictionary<int, Dictionary<string, Dictionary<int, float>>> adjacencyProbs;
-    private Dictionary<string, Dictionary<int, int>> markovModel;
+    private Dictionary<string, Dictionary<string, int>> markovModel;
 
     void Start()
     {
@@ -55,15 +55,8 @@ public class WFCGenerator : MonoBehaviour
         else if (Mode == GenerationMode.MarkovNGram)
         {
             CurrentRunMode = GenerationMode.MarkovNGram;
-            StartCoroutine(MarkovCoroutine());
+            StartCoroutine(MarkovColumnCoroutine());
         }
-    }
-
-    public void GenerateLevelMarkov(int[,] examples, int n)
-    {
-        MarkovN = n;
-        LearnMarkovFromMatrixRowMajor(examples, MarkovN);
-        StartCoroutine(MarkovGenerateFromModel());
     }
 
     public IEnumerator SimpleTiledWFC(int targetGridSize, bool isFinalRender)
@@ -167,7 +160,7 @@ public class WFCGenerator : MonoBehaviour
         yield return null;
     }
 
-    IEnumerator MarkovCoroutine()
+    IEnumerator MarkovColumnCoroutine()
     {
         int[,] sourceMatrix = null;
         if (UseCustomMatrix && ManualMatrix != null && ManualMatrix.rows.Count > 0)
@@ -177,180 +170,98 @@ public class WFCGenerator : MonoBehaviour
             yield return StartCoroutine(SimpleTiledWFC(SimpleTiledContextGridSize, false));
             sourceMatrix = GeneratedContextMatrix;
         }
+
         if (sourceMatrix == null) yield break;
 
         RenderGeneratedMatrix(sourceMatrix);
         yield return new WaitForSeconds(ContextMatrixDisplayTime);
         CleanupPreviousMap();
-        LearnMarkovFromMatrixRowMajor(sourceMatrix, MarkovN);
 
-        AllTileIDs = sourceMatrix.Cast<int>().Distinct().ToList();
-        InitializeGrid(MarkovGridSize);
+        LearnMarkovFromMatrixColumnMajor(sourceMatrix, MarkovColumnN);
+
+        int h = sourceMatrix.GetLength(0);
+        int targetWidth = MarkovColumnGridWidth;
+        float spacing = TileSize;
+        if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
+        float halfMapWorld = (targetWidth - 1) * spacing * 0.5f;
+
         MapContainer = new GameObject("GeneratedMapContainer");
-        for (int r = 0; r < GridSize; r++)
+
+        string currentKey = markovModel.Keys.ElementAt(Random.Range(0, markovModel.Keys.Count));
+        List<string> contextCols = currentKey.Split('|').ToList();
+
+        for (int col = 0; col < targetWidth; col++)
         {
-            for (int c = 0; c < GridSize; c++)
+            string currentColStr = contextCols.Last();
+            int[] colVals = currentColStr.Split(',').Select(int.Parse).ToArray();
+
+            for (int r = 0; r < h; r++)
             {
-                Dictionary<int, float> combined = new Dictionary<int, float>();
-                int[] context = GetGeneratedContextForPositionRowMajor(r, c);
-                if (context != null)
-                {
-                    string key = string.Join(",", context);
-                    if (markovModel.ContainsKey(key))
-                    {
-                        foreach (var kv in markovModel[key])
-                        {
-                            if (!combined.ContainsKey(kv.Key)) combined[kv.Key] = 0f;
-                            combined[kv.Key] += kv.Value;
-                        }
-                    }
-                }
-                if (combined.Count == 0)
-                {
-                    foreach (int id in AllTileIDs)
-                        combined[id] = 1f;
-                }
-                int chosen = ChooseByFloatWeights(combined);
-                Grid[r, c].ChosenTileID = chosen;
-                Grid[r, c].PossibleTileIDs.Clear();
-                Grid[r, c].PossibleTileIDs.Add(chosen);
-                Grid[r, c].Collapsed = true;
-                Tile t = AllTiles.FirstOrDefault(tt => tt.ID == chosen);
-                if (t != null && t.Prefab != null)
-                {
-                    float spacing = TileSize;
-                    if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
-                    float halfMapWorld = (GridSize - 1) * spacing * 0.5f;
-                    Vector3 pos = new Vector3(c * spacing - halfMapWorld, halfMapWorld - r * spacing, 0f);
-                    Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
-                }
-                if (MarkovStepByStep) yield return new WaitForSeconds(MarkovStepDelay);
+                int id = colVals[r];
+                Tile t = AllTiles.FirstOrDefault(tt => tt.ID == id);
+                if (t == null || t.Prefab == null) continue;
+
+                Vector3 pos = new Vector3(col * spacing - halfMapWorld, (h - 1) * spacing * 0.5f - r * spacing, 0f);
+                Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
             }
+
+            if (!markovModel.ContainsKey(currentKey))
+                break;
+
+            string nextCol = WeightedPickString(markovModel[currentKey]);
+            contextCols.Add(nextCol);
+            if (contextCols.Count > MarkovColumnN)
+                contextCols.RemoveAt(0);
+            currentKey = string.Join("|", contextCols);
+
+            if (MarkovColumnStepByStep)
+                yield return new WaitForSeconds(MarkovColumnStepDelay);
         }
+
         yield return null;
     }
 
-    IEnumerator MarkovGenerateFromModel()
+    void LearnMarkovFromMatrixColumnMajor(int[,] matrix, int N)
     {
-        InitializeGrid(MarkovGridSize);
-        MapContainer = new GameObject("GeneratedMapContainer");
-        AllTileIDs = AllTiles.Select(t => t.ID).ToList();
-        int total = GridSize * GridSize;
-        List<int> seq = GenerateSequenceFromModel(total);
-        int idx = 0;
-        for (int r = 0; r < GridSize; r++)
-        {
-            for (int c = 0; c < GridSize; c++)
-            {
-                int chosen = seq[idx++];
-                Grid[r, c].ChosenTileID = chosen;
-                Grid[r, c].PossibleTileIDs.Clear();
-                Grid[r, c].PossibleTileIDs.Add(chosen);
-                Grid[r, c].Collapsed = true;
-                Tile t = AllTiles.FirstOrDefault(tt => tt.ID == chosen);
-                if (t != null && t.Prefab != null)
-                {
-                    float spacing = TileSize;
-                    if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
-                    float halfMapWorld = (GridSize - 1) * spacing * 0.5f;
-                    Vector3 pos = new Vector3((c) * spacing - halfMapWorld, halfMapWorld - (r) * spacing, 0f);
-                    Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
-                }
-                if (MarkovStepByStep) yield return new WaitForSeconds(MarkovStepDelay);
-            }
-        }
-        yield return null;
-    }
-
-    int[] GetGeneratedContextForPositionRowMajor(int r, int c)
-    {
-        int index = r * GridSize + c;
-        List<int> hist = new List<int>();
-        for (int i = index - MarkovN; i < index; i++)
-        {
-            if (i < 0) return null;
-            int rr = i / GridSize;
-            int cc = i % GridSize;
-            Cell ccCell = Grid[rr, cc];
-            if (!ccCell.Collapsed) return null;
-            hist.Add(ccCell.ChosenTileID);
-        }
-        if (hist.Count != MarkovN) return null;
-        return hist.ToArray();
-    }
-
-    List<int> GenerateSequenceFromModel(int length)
-    {
-        List<int> output = new List<int>();
-        if (markovModel == null || markovModel.Count == 0)
-        {
-            for (int i = 0; i < length; i++) output.Add(AllTileIDs[Random.Range(0, AllTileIDs.Count)]);
-            return output;
-        }
-        string seed = markovModel.Keys.ElementAt(Random.Range(0, markovModel.Keys.Count));
-        var parts = seed.Split(',').Select(s => int.Parse(s)).ToArray();
-        foreach (var p in parts) output.Add(p);
-        while (output.Count < length)
-        {
-            string key = string.Join(",", output.Skip(output.Count - MarkovN).Take(MarkovN));
-            if (!markovModel.ContainsKey(key))
-            {
-                output.Add(AllTileIDs[Random.Range(0, AllTileIDs.Count)]);
-                continue;
-            }
-            var options = markovModel[key];
-            int next = WeightedPick(options);
-            output.Add(next);
-        }
-        return output;
-    }
-
-    int WeightedPick(Dictionary<int, int> dict)
-    {
-        int sum = dict.Values.Sum();
-        int roll = Random.Range(0, sum);
-        int cumulative = 0;
-        foreach (var pair in dict)
-        {
-            cumulative += pair.Value;
-            if (roll < cumulative) return pair.Key;
-        }
-        return dict.Keys.First();
-    }
-
-    void LearnMarkovFromMatrixRowMajor(int[,] matrix, int N)
-    {
-        markovModel = new Dictionary<string, Dictionary<int, int>>();
+        markovModel = new Dictionary<string, Dictionary<string, int>>();
         int h = matrix.GetLength(0);
         int w = matrix.GetLength(1);
-        List<int> seq = new List<int>();
-        for (int r = 0; r < h; r++)
-            for (int c = 0; c < w; c++)
-                seq.Add(matrix[r, c]);
-        if (seq.Count <= N) return;
-        for (int i = 0; i <= seq.Count - N - 1; i++)
+
+        List<string> columnStrings = new List<string>();
+        for (int c = 0; c < w; c++)
         {
-            string key = string.Join(",", seq.Skip(i).Take(N));
-            int next = seq[i + N];
-            if (!markovModel.ContainsKey(key)) markovModel[key] = new Dictionary<int, int>();
-            if (!markovModel[key].ContainsKey(next)) markovModel[key][next] = 0;
+            List<int> colVals = new List<int>();
+            for (int r = 0; r < h; r++)
+                colVals.Add(matrix[r, c]);
+            columnStrings.Add(string.Join(",", colVals));
+        }
+
+        if (columnStrings.Count <= N) return;
+        for (int i = 0; i <= columnStrings.Count - N - 1; i++)
+        {
+            string key = string.Join("|", columnStrings.Skip(i).Take(N));
+            string next = columnStrings[i + N];
+
+            if (!markovModel.ContainsKey(key))
+                markovModel[key] = new Dictionary<string, int>();
+            if (!markovModel[key].ContainsKey(next))
+                markovModel[key][next] = 0;
             markovModel[key][next]++;
         }
     }
 
-    int ChooseByFloatWeights(Dictionary<int, float> weights)
+    string WeightedPickString(Dictionary<string, int> dict)
     {
-        if (weights.Count == 0) return AllTileIDs[Random.Range(0, AllTileIDs.Count)];
-        float total = weights.Values.Sum();
-        if (total <= 0f) return weights.Keys.First();
-        float r = Random.Range(0f, total);
-        float acc = 0f;
-        foreach (var kv in weights)
+        int total = dict.Values.Sum();
+        int roll = Random.Range(0, total);
+        int cumulative = 0;
+        foreach (var pair in dict)
         {
-            acc += kv.Value;
-            if (r <= acc) return kv.Key;
+            cumulative += pair.Value;
+            if (roll < cumulative)
+                return pair.Key;
         }
-        return weights.Keys.Last();
+        return dict.Keys.First();
     }
 
     Dictionary<int, Dictionary<string, Dictionary<int, float>>> ComputeAdjacencyProbabilities(int[,] matrix)
