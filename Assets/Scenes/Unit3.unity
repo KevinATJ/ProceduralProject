@@ -259,9 +259,9 @@ MonoBehaviour:
   TileSize: 0
   ContextMatrixDisplayTime: 5
   MarkovColumnN: 1
-  MarkovColumnGridWidth: 10
+  MarkovColumnGridWidth: 20
   MarkovColumnStepByStep: 1
-  MarkovColumnStepDelay: 0.02
+  MarkovColumnStepDelay: 1
 --- !u!4 &583782450
 Transform:
   m_ObjectHideFlags: 0
@@ -396,7 +396,7 @@ MonoBehaviour:
   TileSize: 0
   ContextMatrixDisplayTime: 3
   MarkovColumnN: 1
-  MarkovColumnGridWidth: 30
+  MarkovColumnGridWidth: 40
   MarkovColumnStepByStep: 1
   MarkovColumnStepDelay: 0.02
 --- !u!1 &1997139894
