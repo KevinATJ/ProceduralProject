@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 
 public class WFCGenerator : MonoBehaviour
 {
@@ -11,6 +12,10 @@ public class WFCGenerator : MonoBehaviour
     public GenerationMode Mode = GenerationMode.SimpleTiled;
     public bool UseCustomMatrix = false;
     public EditableMatrix ManualMatrix;
+
+    [Header("Configuración de la vista")]
+    public bool PreviewGeneratedMaps = true;
+    public float TotalPreviewTime = 10f;
 
     [Header("Configuración general")]
     public Tile[] AllTiles;
@@ -28,6 +33,18 @@ public class WFCGenerator : MonoBehaviour
     public bool MarkovColumnStepByStep = false;
     public float MarkovColumnStepDelay = 0.02f;
 
+    [Header("Nuevas opciones: Dataset manual (.txt) y guardado")]
+    [Tooltip("Si true, cargará múltiples .txt (ManualMapLoader) y entrenará con todo el conjunto")]
+    public bool UseManualTXTMaps = false;
+    [Tooltip("Instancia opcional del loader (si no está asignado se buscará automáticamente)")]
+    public ManualMapLoader ManualMapLoaderRef;
+    [Tooltip("Si true, se guardarán los mapas generados en Assets/GeneratedMaps/ usando MapRecorder")]
+    public bool SaveGeneratedToTxt = false;
+    [Tooltip("Cuántos mapas generar y guardar (cuando aplique)")]
+    public int GeneratedToSaveCount = 10;
+    [Tooltip("Referencia opcional a MapRecorder (si no está asignada, se buscará automáticamente)")]
+    public MapRecorder MapRecorderRef;
+
     [SerializeField]
     GameObject Transcriptor;
 
@@ -41,10 +58,25 @@ public class WFCGenerator : MonoBehaviour
     private Dictionary<int, Dictionary<string, Dictionary<int, float>>> adjacencyProbs;
     private Dictionary<string, Dictionary<string, int>> markovModel;
 
+    [HideInInspector]
+    public List<int[,]> TrainingMaps = new List<int[,]>();
+
     void Start()
     {
         if (AllTiles == null || AllTiles.Length == 0) return;
+        if (ManualMapLoaderRef == null)
+            ManualMapLoaderRef = FindObjectOfType<ManualMapLoader>();
+        if (MapRecorderRef == null)
+            MapRecorderRef = FindObjectOfType<MapRecorder>();
+
         CleanupPreviousMap();
+
+        if (UseManualTXTMaps && ManualMapLoaderRef != null)
+        {
+            TrainingMaps = ManualMapLoaderRef.LoadAllManualMaps();
+            if (TrainingMaps == null) TrainingMaps = new List<int[,]>();
+        }
+
         if (Mode == GenerationMode.SimpleTiled)
         {
             CurrentRunMode = GenerationMode.SimpleTiled;
@@ -111,63 +143,124 @@ public class WFCGenerator : MonoBehaviour
         int[,] sourceMatrix = null;
         CurrentRunMode = GenerationMode.ComplexWFC;
 
-        if (UseCustomMatrix && ManualMatrix != null && ManualMatrix.rows.Count > 0)
+        if (UseManualTXTMaps && ManualMapLoaderRef != null)
+        {
+            if (TrainingMaps == null || TrainingMaps.Count == 0)
+                TrainingMaps = ManualMapLoaderRef.LoadAllManualMaps();
+
+            if (TrainingMaps != null && TrainingMaps.Count > 0)
+                sourceMatrix = TrainingMaps[0];
+        }
+        else if (UseCustomMatrix && ManualMatrix != null && ManualMatrix.rows.Count > 0)
+        {
             sourceMatrix = ManualMatrix.ToArray();
+        }
         else
         {
             yield return StartCoroutine(SimpleTiledWFC(SimpleTiledContextGridSize, false));
             sourceMatrix = GeneratedContextMatrix;
         }
+
         if (sourceMatrix == null) yield break;
 
         RenderGeneratedMatrix(sourceMatrix);
         yield return new WaitForSeconds(ContextMatrixDisplayTime);
-
         CleanupPreviousMap();
-        adjacencyProbs = ComputeAdjacencyProbabilities(sourceMatrix);
 
-        AllTileIDs = sourceMatrix.Cast<int>().Distinct().ToList();
-        InitializeGrid(FinalOverlappingGridSize);
-
-        int safetyCounter = 0;
-        int safetyLimit = FinalOverlappingGridSize * FinalOverlappingGridSize * 50;
-
-        while (!CheckIfDone() && safetyCounter < safetyLimit)
+        if (UseManualTXTMaps && TrainingMaps != null && TrainingMaps.Count > 0)
         {
-            safetyCounter++;
-            Cell cellToCollapse = FindCellWithMinEntropy();
+            adjacencyProbs = ComputeAdjacencyProbabilitiesFromMultiple(TrainingMaps);
+            AllTileIDs = TrainingMaps.SelectMany(m => m.Cast<int>()).Distinct().ToList();
+        }
+        else
+        {
+            adjacencyProbs = ComputeAdjacencyProbabilities(sourceMatrix);
+            AllTileIDs = sourceMatrix.Cast<int>().Distinct().ToList();
+        }
 
-            if (cellToCollapse == null || cellToCollapse.IsContradiction)
+        for (int gen = 0; gen < Mathf.Max(1, GeneratedToSaveCount); gen++)
+        {
+            InitializeGrid(FinalOverlappingGridSize);
+
+            int safetyCounter = 0;
+            int safetyLimit = FinalOverlappingGridSize * FinalOverlappingGridSize * 50;
+
+            while (!CheckIfDone() && safetyCounter < safetyLimit)
             {
-                if (HistoryStack.Count > 0)
+                safetyCounter++;
+                Cell cellToCollapse = FindCellWithMinEntropy();
+
+                if (cellToCollapse == null || cellToCollapse.IsContradiction)
                 {
-                    Grid = HistoryStack.Pop();
-                    yield return null;
-                    continue;
+                    if (HistoryStack.Count > 0)
+                    {
+                        Grid = HistoryStack.Pop();
+                        yield return null;
+                        continue;
+                    }
+                    else
+                    {
+                        if (CheckIfDone()) break;
+                        InitializeGrid(FinalOverlappingGridSize);
+                        yield return null;
+                        continue;
+                    }
                 }
-                else
-                {
-                    if (CheckIfDone()) break;
-                    InitializeGrid(FinalOverlappingGridSize);
-                    yield return null;
-                    continue;
-                }
+
+                SaveState();
+                CollapseCellProbabilistic(cellToCollapse, true);
+                Propagate(cellToCollapse);
+
+                yield return new WaitForSeconds(StepDelay);
             }
 
-            SaveState();
-            CollapseCellProbabilistic(cellToCollapse, true);
-            Propagate(cellToCollapse);
+            GeneratedContextMatrix = ExtractMatrixFromGrid();
 
-            yield return new WaitForSeconds(StepDelay);
+            if (PreviewGeneratedMaps)
+            {
+                CleanupPreviousMap();
+                MapContainer = new GameObject("GeneratedMapContainer");
+
+                RenderGeneratedMatrix(GeneratedContextMatrix);
+
+                float previewTimePerMap = TotalPreviewTime / Mathf.Max(1, GeneratedToSaveCount);
+                yield return new WaitForSeconds(previewTimePerMap);
+
+                CleanupPreviousMap();
+            }
+
+
+            if (SaveGeneratedToTxt && MapRecorderRef != null)
+            {
+                string fileName = $"wfc_generated_{System.DateTime.Now.ToString("yyyyMMdd_HHmmss")}_{gen}.txt";
+                MapRecorderRef.SaveMap(GeneratedContextMatrix, fileName);
+                Debug.Log($"Guardado WFC generado #{gen} -> {fileName}");
+            }
+
+            yield return null;
         }
+
         yield return null;
     }
+
 
     IEnumerator MarkovColumnCoroutine()
     {
         int[,] sourceMatrix = null;
-        if (UseCustomMatrix && ManualMatrix != null && ManualMatrix.rows.Count > 0)
+        CurrentRunMode = GenerationMode.MarkovNGram;
+
+        if (UseManualTXTMaps && ManualMapLoaderRef != null)
+        {
+            if (TrainingMaps == null || TrainingMaps.Count == 0)
+                TrainingMaps = ManualMapLoaderRef.LoadAllManualMaps();
+
+            if (TrainingMaps != null && TrainingMaps.Count > 0)
+                sourceMatrix = TrainingMaps[0];
+        }
+        else if (UseCustomMatrix && ManualMatrix != null && ManualMatrix.rows.Count > 0)
+        {
             sourceMatrix = ManualMatrix.ToArray();
+        }
         else
         {
             yield return StartCoroutine(SimpleTiledWFC(SimpleTiledContextGridSize, false));
@@ -180,7 +273,14 @@ public class WFCGenerator : MonoBehaviour
         yield return new WaitForSeconds(ContextMatrixDisplayTime);
         CleanupPreviousMap();
 
-        LearnMarkovFromMatrixColumnMajor(sourceMatrix, MarkovColumnN);
+        if (UseManualTXTMaps && TrainingMaps != null && TrainingMaps.Count > 0)
+        {
+            LearnMarkovFromMultiple(TrainingMaps, MarkovColumnN);
+        }
+        else
+        {
+            LearnMarkovFromMatrixColumnMajor(sourceMatrix, MarkovColumnN);
+        }
 
         int h = sourceMatrix.GetLength(0);
         int targetWidth = MarkovColumnGridWidth;
@@ -188,45 +288,116 @@ public class WFCGenerator : MonoBehaviour
         if (Mathf.Approximately(spacing, 0f)) spacing = GetDefaultSpacing();
         float halfMapWorld = (targetWidth - 1) * spacing * 0.5f;
 
-        MapContainer = new GameObject("GeneratedMapContainer");
-
-        string currentKey = markovModel.Keys.ElementAt(Random.Range(0, markovModel.Keys.Count));
-        List<string> contextCols = currentKey.Split('|').ToList();
-
-        for (int col = 0; col < targetWidth; col++)
+        if (markovModel == null || markovModel.Count == 0)
         {
-            string currentColStr = contextCols.Last();
-            int[] colVals = currentColStr.Split(',').Select(int.Parse).ToArray();
+            Debug.LogWarning("Markov model vacío: no se puede generar.");
+            yield break;
+        }
 
-            for (int r = 0; r < h; r++)
+        for (int gen = 0; gen < Mathf.Max(1, GeneratedToSaveCount); gen++)
+        {
+            CleanupPreviousMap();
+            MapContainer = new GameObject("GeneratedMapContainer");
+
+            string currentKey = markovModel.Keys.ElementAt(Random.Range(0, markovModel.Keys.Count));
+            List<string> contextCols = currentKey.Split('|').ToList();
+
+            int[,] generatedMatrix = new int[h, targetWidth];
+
+            for (int i = 0; i < contextCols.Count && i < targetWidth; i++)
             {
-                int id = colVals[r];
-                Tile t = AllTiles.FirstOrDefault(tt => tt.ID == id);
-                if (t == null || t.Prefab == null) continue;
-
-                Vector3 pos = new Vector3(col * spacing - halfMapWorld, (h - 1) * spacing * 0.5f - r * spacing, 0f);
-                Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
+                int[] colVals = contextCols[i].Split(',').Select(int.Parse).ToArray();
+                for (int r = 0; r < h && r < colVals.Length; r++)
+                    generatedMatrix[r, i] = colVals[r];
             }
 
-            if (!markovModel.ContainsKey(currentKey))
-                break;
+            for (int col = contextCols.Count; col < targetWidth; col++)
+            {
+                string currentColStr = contextCols.Last();
+                int[] colVals = currentColStr.Split(',').Select(int.Parse).ToArray();
 
-            string nextCol = WeightedPickString(markovModel[currentKey]);
-            contextCols.Add(nextCol);
-            if (contextCols.Count > MarkovColumnN)
-                contextCols.RemoveAt(0);
-            currentKey = string.Join("|", contextCols);
+                for (int r = 0; r < h; r++)
+                {
+                    int id = colVals[r];
+                    Tile t = AllTiles.FirstOrDefault(tt => tt.ID == id);
+                    if (t == null || t.Prefab == null) continue;
 
-            if (MarkovColumnStepByStep)
-                yield return new WaitForSeconds(MarkovColumnStepDelay);
+                    Vector3 pos = new Vector3(col * spacing - halfMapWorld, (h - 1) * spacing * 0.5f - r * spacing, 0f);
+                    Instantiate(t.Prefab, pos, t.Prefab.transform.rotation, MapContainer.transform);
+
+                    generatedMatrix[r, col] = id;
+                }
+
+                if (!markovModel.ContainsKey(currentKey))
+                    break;
+
+                string nextCol = WeightedPickString(markovModel[currentKey]);
+                if (nextCol == null) break;
+
+                contextCols.Add(nextCol);
+                if (contextCols.Count > MarkovColumnN)
+                    contextCols.RemoveAt(0);
+                currentKey = string.Join("|", contextCols);
+
+                if (MarkovColumnStepByStep)
+                    yield return new WaitForSeconds(MarkovColumnStepDelay);
+            }
+
+            if (PreviewGeneratedMaps)
+            {
+                CleanupPreviousMap();
+                MapContainer = new GameObject("GeneratedMapContainer");
+
+                RenderGeneratedMatrix(generatedMatrix);
+
+                float previewTimePerMap = TotalPreviewTime / Mathf.Max(1, GeneratedToSaveCount);
+                yield return new WaitForSeconds(previewTimePerMap);
+
+                CleanupPreviousMap();
+            }
+
+            if (SaveGeneratedToTxt && MapRecorderRef != null)
+            {
+                string fileName = $"markov_generated_{System.DateTime.Now.ToString("yyyyMMdd_HHmmss")}_{gen}.txt";
+                MapRecorderRef.SaveMap(generatedMatrix, fileName);
+                Debug.Log($"Guardado Markov generado #{gen} -> {fileName}");
+            }
+
+            yield return null;
         }
 
         yield return null;
     }
 
+
+    private string WeightedPickString(Dictionary<string, int> weightedOptions)
+    {
+        if (weightedOptions == null || weightedOptions.Count == 0)
+            return null;
+
+        int total = weightedOptions.Values.Sum();
+        int roll = Random.Range(0, total);
+        int cumulative = 0;
+
+        foreach (var kvp in weightedOptions)
+        {
+            cumulative += kvp.Value;
+            if (roll < cumulative)
+                return kvp.Key;
+        }
+
+        return weightedOptions.Keys.First();
+    }
+
+
     void LearnMarkovFromMatrixColumnMajor(int[,] matrix, int N)
     {
-        markovModel = new Dictionary<string, Dictionary<string, int>>();
+        markovModel = BuildMarkovModelForSingle(matrix, N);
+    }
+
+    Dictionary<string, Dictionary<string, int>> BuildMarkovModelForSingle(int[,] matrix, int N)
+    {
+        var model = new Dictionary<string, Dictionary<string, int>>();
         int h = matrix.GetLength(0);
         int w = matrix.GetLength(1);
 
@@ -239,32 +410,89 @@ public class WFCGenerator : MonoBehaviour
             columnStrings.Add(string.Join(",", colVals));
         }
 
-        if (columnStrings.Count <= N) return;
+        if (columnStrings.Count <= N) return model;
+
         for (int i = 0; i <= columnStrings.Count - N - 1; i++)
         {
             string key = string.Join("|", columnStrings.Skip(i).Take(N));
             string next = columnStrings[i + N];
 
-            if (!markovModel.ContainsKey(key))
-                markovModel[key] = new Dictionary<string, int>();
-            if (!markovModel[key].ContainsKey(next))
-                markovModel[key][next] = 0;
-            markovModel[key][next]++;
+            if (!model.ContainsKey(key))
+                model[key] = new Dictionary<string, int>();
+            if (!model[key].ContainsKey(next))
+                model[key][next] = 0;
+            model[key][next]++;
+        }
+
+        return model;
+    }
+
+    void LearnMarkovFromMultiple(List<int[,]> maps, int N)
+    {
+        markovModel = new Dictionary<string, Dictionary<string, int>>();
+        foreach (var matrix in maps)
+        {
+            var local = BuildMarkovModelForSingle(matrix, N);
+            foreach (var key in local.Keys)
+            {
+                if (!markovModel.ContainsKey(key))
+                    markovModel[key] = new Dictionary<string, int>();
+
+                foreach (var next in local[key].Keys)
+                {
+                    if (!markovModel[key].ContainsKey(next))
+                        markovModel[key][next] = 0;
+                    markovModel[key][next] += local[key][next];
+                }
+            }
         }
     }
 
-    string WeightedPickString(Dictionary<string, int> dict)
+    Dictionary<int, Dictionary<string, Dictionary<int, float>>> ComputeAdjacencyProbabilitiesFromMultiple(List<int[,]> maps)
     {
-        int total = dict.Values.Sum();
-        int roll = Random.Range(0, total);
-        int cumulative = 0;
-        foreach (var pair in dict)
+        var combined = new Dictionary<int, Dictionary<string, Dictionary<int, float>>>();
+        foreach (var map in maps)
         {
-            cumulative += pair.Value;
-            if (roll < cumulative)
-                return pair.Key;
+            var local = ComputeAdjacencyProbabilities(map);
+            foreach (var tile in local.Keys)
+            {
+                if (!combined.ContainsKey(tile))
+                    combined[tile] = new Dictionary<string, Dictionary<int, float>>()
+                    {
+                        {"UP", new Dictionary<int,float>()},
+                        {"DOWN", new Dictionary<int,float>()},
+                        {"LEFT", new Dictionary<int,float>()},
+                        {"RIGHT", new Dictionary<int,float>()}
+                    };
+
+                foreach (var dir in local[tile].Keys)
+                {
+                    foreach (var kv in local[tile][dir])
+                    {
+                        if (!combined[tile][dir].ContainsKey(kv.Key))
+                            combined[tile][dir][kv.Key] = kv.Value;
+                        else
+                            combined[tile][dir][kv.Key] += kv.Value;
+                    }
+                }
+            }
         }
-        return dict.Keys.First();
+
+        foreach (var tile in combined.Keys)
+        {
+            foreach (var dir in combined[tile].Keys)
+            {
+                float sum = combined[tile][dir].Values.Sum();
+                if (sum > 0)
+                {
+                    var keys = combined[tile][dir].Keys.ToList();
+                    foreach (var k in keys)
+                        combined[tile][dir][k] /= sum;
+                }
+            }
+        }
+
+        return combined;
     }
 
     Dictionary<int, Dictionary<string, Dictionary<int, float>>> ComputeAdjacencyProbabilities(int[,] matrix)
@@ -599,5 +827,20 @@ public class WFCGenerator : MonoBehaviour
         return true;
     }
 
+    private int[,] ExtractMatrixFromGrid()
+    {
+        if (Grid == null) return null;
+        int s = GridSize;
+        int[,] mat = new int[s, s];
+        for (int r = 0; r < s; r++)
+            for (int c = 0; c < s; c++)
+            {
+                int id = Grid[r, c].ChosenTileID;
+                if (id == -1 || !Grid[r, c].Collapsed)
+                    id = AllTileIDs[Random.Range(0, AllTileIDs.Count)];
+                mat[r, c] = id;
+            }
+        return mat;
+    }
 
 }
