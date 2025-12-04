@@ -71,8 +71,49 @@ El objetivo de este es permitir crear puzzles resolubles de distinta dificultad 
 
 ---
 
+
+
 ## 4) Instrucciones de uso en Ejecutable
 1. Ejecuta My Project
 2. Presiona tecla [ESC] para modificar los algoritmos y las semillas.
+
+
+---
+
+
+## Proyecto 3: Mapas PCGML
+
+Este proyecto presenta un sistema de generación de mapas en unity y en google colab.
+El objetivo es permitir crear grandes variedades de mapas con distintos algoritmos, considerando etiquetarlos. 
+Dentro de sus detalles se encuentran mapas formados por 4 tipos de tiles distintos:
+  1) Pasto
+  2) Casas
+  3) Personas
+  4) Agua
+
+
+- **Motor:** Unity 2D 2022.3.30f1
+- **Lenguaje:** C#  
+---
+
+## 2) Algoritmos usados
+1. **WFC Complex:**
+   Genera mapas nuevos a partir de patrones locales aprendidos del dataset. Usa propagación de restricciones para asegurar coherencia entre tiles y colapsa las celdas siguiendo reglas de compatibilidad
+2. **Markov:**
+    Genera mapas modelando probabilidades de transición entre tiles. Cada celda se elige según lo que suele aparecer junto a sus vecinas, creando variaciones rápidas y ligeras del estilo base.
+3. **NN:**
+   Predice la etiqueta del mapa (en este caso tipo de mapa) aprendiendo relaciones entre su estructura y la clase asignada. Permite automatizar el proceso de evaluación a partir del dataset entrenado.
+3. **GAN:**
+   Genera mapas completamente nuevos enfrentando dos redes, un generador que produce niveles y un discriminador que evalúa si se parecen al dataset real. Con el entrenamiento, crea estructuras originales y variadas.
+   
+---
+
+
+## 3) Instrucciones de uso en Unity
+1. Clona el repositorio:  [Repositorio] (https://github.com/KevinATJ/ProceduralProject/tree/Unit3)
+2. Descarga o ejecuta el proyecto en Unity 2022.3.30f1
+3. Dirigete a la escena Unit3
+4. Revisa las variables del Map y cambialas si las deseas.
+5. Ejecuta el proyecto.
 
 
