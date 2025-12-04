@@ -317,7 +317,7 @@ MonoBehaviour:
     - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
     - values: 00000000000000000000000000000000000000000000000000000000000000000000000000000000
   PreviewGeneratedMaps: 1
-  TotalPreviewTime: 10
+  TotalPreviewTime: 2
   AllTiles:
   - ID: 0
     Name: Grass
@@ -479,8 +479,8 @@ MonoBehaviour:
     DownCompatibility: 0000000003000000
     LeftCompatibility: 03000000
     RightCompatibility: 03000000
-  SimpleTiledContextGridSize: 10
-  FinalOverlappingGridSize: 5
+  SimpleTiledContextGridSize: 8
+  FinalOverlappingGridSize: 8
   StepDelay: 0.01
   TileSize: 0
   ContextMatrixDisplayTime: 3
@@ -488,12 +488,12 @@ MonoBehaviour:
   MarkovColumnGridWidth: 8
   MarkovColumnStepByStep: 1
   MarkovColumnStepDelay: 0.01
-  ComplexWFCSeed: 782787984
-  MarkovNGramSeed: 782787984
+  ComplexWFCSeed: 1308757463
+  MarkovNGramSeed: 0
   UseManualTXTMaps: 0
   ManualMapLoaderRef: {fileID: 760723554}
   SaveGeneratedToTxt: 1
-  GeneratedToSaveCount: 10
+  GeneratedToSaveCount: 5
   MapRecorderRef: {fileID: 760723553}
   Transcriptor: {fileID: 0}
 --- !u!1 &760723552
