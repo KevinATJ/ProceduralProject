@@ -33,6 +33,12 @@ public class WFCGenerator : MonoBehaviour
     public bool MarkovColumnStepByStep = false;
     public float MarkovColumnStepDelay = 0.02f;
 
+    [Header("Seeds (0 = aleatorio)")]
+    [Tooltip("Seed para Complex WFC. 0 = aleatorio cada vez")]
+    public int ComplexWFCSeed = 0;
+    [Tooltip("Seed para Markov N-gram. 0 = aleatorio cada vez")]
+    public int MarkovNGramSeed = 0;
+
     [Header("Nuevas opciones: Dataset manual (.txt) y guardado")]
     [Tooltip("Si true, cargará múltiples .txt (ManualMapLoader) y entrenará con todo el conjunto")]
     public bool UseManualTXTMaps = false;
@@ -60,6 +66,10 @@ public class WFCGenerator : MonoBehaviour
 
     [HideInInspector]
     public List<int[,]> TrainingMaps = new List<int[,]>();
+
+    // ============ NUEVO: Estado del Random ============
+    private Random.State savedRandomState;
+    // ==================================================
 
     void Start()
     {
@@ -140,6 +150,14 @@ public class WFCGenerator : MonoBehaviour
 
     IEnumerator ProbabilisticWFC()
     {
+        int actualSeed = ComplexWFCSeed;
+        if (actualSeed == 0)
+        {
+            actualSeed = Random.Range(1, int.MaxValue);
+        }
+        Random.InitState(actualSeed);
+        Debug.Log($"Complex WFC usando seed: {actualSeed}");
+
         int[,] sourceMatrix = null;
         CurrentRunMode = GenerationMode.ComplexWFC;
 
@@ -229,12 +247,11 @@ public class WFCGenerator : MonoBehaviour
                 CleanupPreviousMap();
             }
 
-
             if (SaveGeneratedToTxt && MapRecorderRef != null)
             {
-                string fileName = $"wfc_generated_{System.DateTime.Now.ToString("yyyyMMdd_HHmmss")}_{gen}.txt";
+                string fileName = $"wfc_generated_seed{actualSeed}_{System.DateTime.Now.ToString("yyyyMMdd_HHmmss")}_{gen}.txt";
                 MapRecorderRef.SaveMap(GeneratedContextMatrix, fileName);
-                Debug.Log($"Guardado WFC generado #{gen} -> {fileName}");
+                Debug.Log($"Guardado WFC generado #{gen} (seed: {actualSeed}) -> {fileName}");
             }
 
             yield return null;
@@ -243,9 +260,16 @@ public class WFCGenerator : MonoBehaviour
         yield return null;
     }
 
-
     IEnumerator MarkovColumnCoroutine()
     {
+        int actualSeed = MarkovNGramSeed;
+        if (actualSeed == 0)
+        {
+            actualSeed = Random.Range(1, int.MaxValue);
+        }
+        Random.InitState(actualSeed);
+        Debug.Log($"Markov N-gram usando seed: {actualSeed}");
+
         int[,] sourceMatrix = null;
         CurrentRunMode = GenerationMode.MarkovNGram;
 
@@ -358,9 +382,9 @@ public class WFCGenerator : MonoBehaviour
 
             if (SaveGeneratedToTxt && MapRecorderRef != null)
             {
-                string fileName = $"markov_generated_{System.DateTime.Now.ToString("yyyyMMdd_HHmmss")}_{gen}.txt";
+                string fileName = $"markov_generated_seed{actualSeed}_{System.DateTime.Now.ToString("yyyyMMdd_HHmmss")}_{gen}.txt";
                 MapRecorderRef.SaveMap(generatedMatrix, fileName);
-                Debug.Log($"Guardado Markov generado #{gen} -> {fileName}");
+                Debug.Log($"Guardado Markov generado #{gen} (seed: {actualSeed}) -> {fileName}");
             }
 
             yield return null;
@@ -368,7 +392,6 @@ public class WFCGenerator : MonoBehaviour
 
         yield return null;
     }
-
 
     private string WeightedPickString(Dictionary<string, int> weightedOptions)
     {
@@ -388,7 +411,6 @@ public class WFCGenerator : MonoBehaviour
 
         return weightedOptions.Keys.First();
     }
-
 
     void LearnMarkovFromMatrixColumnMajor(int[,] matrix, int N)
     {

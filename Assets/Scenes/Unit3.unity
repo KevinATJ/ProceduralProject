@@ -265,6 +265,8 @@ MonoBehaviour:
   MarkovColumnGridWidth: 20
   MarkovColumnStepByStep: 1
   MarkovColumnStepDelay: 1
+  ComplexWFCSeed: 0
+  MarkovNGramSeed: 0
   UseManualTXTMaps: 0
   ManualMapLoaderRef: {fileID: 0}
   SaveGeneratedToTxt: 0
@@ -410,6 +412,8 @@ MonoBehaviour:
   MarkovColumnGridWidth: 8
   MarkovColumnStepByStep: 1
   MarkovColumnStepDelay: 0.01
+  ComplexWFCSeed: 0
+  MarkovNGramSeed: 0
   UseManualTXTMaps: 1
   ManualMapLoaderRef: {fileID: 760723554}
   SaveGeneratedToTxt: 1
@@ -484,6 +488,8 @@ MonoBehaviour:
   MarkovColumnGridWidth: 8
   MarkovColumnStepByStep: 1
   MarkovColumnStepDelay: 0.01
+  ComplexWFCSeed: 782787984
+  MarkovNGramSeed: 782787984
   UseManualTXTMaps: 0
   ManualMapLoaderRef: {fileID: 760723554}
   SaveGeneratedToTxt: 1
